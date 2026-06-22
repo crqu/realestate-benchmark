@@ -65,3 +65,4 @@ logs/
 # Benchmark outputs
 outputs/
 results/
+.claude/
