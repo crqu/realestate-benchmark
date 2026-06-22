@@ -320,8 +320,8 @@ def compute_game_metrics(
     outcome = state.outcome or TransactionOutcome(completed=False, final_price=0)
     asking_price = state.listing.asking_price if state.listing else 0
 
-    p2_welfare_gap = compute_p2_welfare_gap(outcome, true_value, outcome.final_price)
-    p2_nbs_deviation = compute_p2_nbs_deviation(outcome.final_price, asking_price, true_value)
+    p2_welfare_gap = compute_p2_welfare_gap(outcome, true_value)
+    p2_nbs_deviation = compute_p2_nbs_deviation(outcome, asking_price, true_value)
 
     # P3: Influence Legitimacy
     p3_influence = compute_p3_influence_legitimacy(transcript, state, defects)
