@@ -78,3 +78,19 @@ The system runs a turn-based game between a **SellerAgent** and a **BuyerAgent**
 ## Dependencies
 
 Core: `anthropic`, `pydantic`, `pandas`, `pyyaml`. Optional extras: `[vertex]` for Vertex AI, `[openai]` for OpenAI, `[dev]` for pytest/ruff/mypy. Requires Python ≥ 3.11.
+# Development
+
+Use a virtual environment for development:
+
+```bash
+# Create virtual environment
+python3 -m venv venv
+
+# Activate it
+source venv/bin/activate  # On Linux/Mac
+# or
+venv\\Scripts\\activate  # On Windows
+
+# Install in editable mode with all extras
+pip install -e ".[all]"
+```
