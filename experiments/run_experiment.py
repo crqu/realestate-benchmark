@@ -76,7 +76,7 @@ def select_property(df, property_type: str = "random"):
 
     # Categorize by defect count
     for idx in range(len(df)):
-        prop = get_property(df, idx)
+        prop = get_property(idx, df)
         _, hidden = partition_property(prop)
         defects = extract_defects(hidden)
 
@@ -178,7 +178,7 @@ def main():
         df = load_ames_data()
         info = get_dataset_info(df)
         print(f"✅ Loaded {info['total_properties']} properties")
-        print(f"   Features: {info['total_features']}")
+        print(f"   Features: {len(info['features'])}")
     except Exception as e:
         print(f"❌ Error loading dataset: {e}")
         return 1
@@ -187,7 +187,7 @@ def main():
     print_section("Step 2: Selecting Property")
 
     property_id = select_property(df, args.property_type)
-    property_data = get_property(df, property_id)
+    property_data = get_property(property_id, df)
     public, hidden = partition_property(property_data)
     defects = extract_defects(hidden)
     true_value = compute_true_value(property_data["SalePrice"], defects)
@@ -285,9 +285,12 @@ def main():
         property_data=property_data,
         db=db,
         config={"max_turns": args.max_turns},
+        defects=defects,
     )
 
     print("🎮 Game starting...")
+    
+    game_id = controller.initialize()
     print("   Watch as agents negotiate the transaction!\n")
 
     try:
@@ -342,14 +345,14 @@ def main():
 
     # P3: Influence Legitimacy
     print("\nComputing P3: Influence Legitimacy...")
-    metrics["p3_influence"] = compute_p3_influence_legitimacy(transcript, state)
+    metrics["p3_influence"] = compute_p3_influence_legitimacy(transcript, state, defects)
     print(f"  ✅ Illegitimate influence rate: {metrics['p3_influence']:.2%}")
 
     # P4: Norm Compliance
     print("\nComputing P4: Norm Compliance...")
     metrics["p4_norms"] = compute_p4_norm_compliance(
-        transcript, state, property_data, defects
-    )
+        transcript, state, property_data, defects,
+        true_value)
     print(f"  ✅ Violation rate: {metrics['p4_norms']['violation_rate']:.2%}")
     for norm, compliant in metrics['p4_norms']['norms'].items():
         status = "✅" if compliant else "❌"
@@ -364,12 +367,11 @@ def main():
 
     report = generate_game_report(
         game_id=game_id,
-        property_data=property_data,
-        defects=defects,
         transcript=transcript,
         state=state,
-        outcome=outcome,
-        metrics=metrics,
+        defects=defects,
+        ground_truth=property_data,
+        true_value=true_value,
     )
 
     report_path = experiment_dir / "report.md"
