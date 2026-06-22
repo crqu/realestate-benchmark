@@ -9,6 +9,7 @@ from realestate_benchmark.models.interface import (
     ToolDefinition,
 )
 from realestate_benchmark.models.mock import MockModel
+from realestate_benchmark.models.vertex import VertexModel
 
 __all__ = [
     "AnthropicModel",
@@ -18,4 +19,5 @@ __all__ = [
     "ToolCall",
     "ToolDefinition",
     "MockModel",
+    "VertexModel",
 ]
