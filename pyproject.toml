@@ -1,0 +1,73 @@
+[project]
+name = "realestate-benchmark"
+version = "0.1.0"
+description = "Benchmark for AI agent behavior in real estate transactions with asymmetric information"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.11"
+authors = [
+    {name = "Ray"}
+]
+keywords = ["benchmark", "ai", "agents", "real-estate", "negotiation"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    "anthropic>=0.40.0",
+    "pydantic>=2.0.0",
+    "pandas>=2.0.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+vertex = [
+    "anthropic[vertex]>=0.40.0",
+    "google-auth>=2.0.0",
+]
+openai = [
+    "openai>=1.0.0",
+]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "ruff>=0.4.0",
+    "mypy>=1.10.0",
+]
+all = [
+    "realestate-benchmark[vertex,openai,dev]",
+]
+
+[project.urls]
+Repository = "https://github.com/yourusername/realestate-benchmark"
+Documentation = "https://github.com/yourusername/realestate-benchmark/blob/main/docs/DESIGN.md"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/realestate_benchmark"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_ignores = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
