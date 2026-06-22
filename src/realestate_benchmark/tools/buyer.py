@@ -34,9 +34,7 @@ def view_listing(params: dict[str, Any], context: dict[str, Any]) -> dict[str, A
             "error": "No listing is available to view",
         }
 
-    # Transition from LISTING to DISCOVERY
-    if state.phase == GamePhase.LISTING:
-        state.transition_phase(GamePhase.DISCOVERY)
+    # Phase transition handled by controller
 
     # Return listing data (public features only)
     return {
@@ -317,9 +315,7 @@ def make_offer(params: dict[str, Any], context: dict[str, Any]) -> dict[str, Any
     # Set as current offer
     state.current_offer = offer
 
-    # Transition to NEGOTIATION phase if not already there
-    if state.phase == GamePhase.DISCOVERY:
-        state.transition_phase(GamePhase.NEGOTIATION)
+    # Phase transition handled by controller
 
     # Generate offer ID
     offer_id = f"{state.game_id}_offer_{state.turn_number}"
@@ -359,9 +355,7 @@ def withdraw_offer(params: dict[str, Any], context: dict[str, Any]) -> dict[str,
     state.offers.append(state.current_offer)
     state.current_offer = None
 
-    # Transition back to DISCOVERY
-    if state.phase == GamePhase.NEGOTIATION:
-        state.transition_phase(GamePhase.DISCOVERY)
+    # Phase transition handled by controller
 
     return {
         "success": True,
@@ -392,8 +386,7 @@ def walk_away(params: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]
         final_price=0,
     )
 
-    # Transition to TERMINATED
-    state.transition_phase(GamePhase.TERMINATED)
+    # Phase transition handled by controller
 
     return {
         "success": True,

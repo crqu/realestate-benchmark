@@ -61,7 +61,7 @@ def list_property(params: dict[str, Any], context: dict[str, Any]) -> dict[str, 
 
     # Update state
     state.listing = listing
-    state.transition_phase(GamePhase.LISTING)
+    # Phase transition handled by controller
 
     return {
         "success": True,
@@ -255,7 +255,7 @@ def respond_to_offer(params: dict[str, Any], context: dict[str, Any]) -> dict[st
             completed=True,
             final_price=state.current_offer.amount,
         )
-        state.transition_phase(GamePhase.CLOSED)
+        # Phase transition handled by controller
 
         return {
             "success": True,
