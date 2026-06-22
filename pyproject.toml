@@ -28,7 +28,7 @@ dependencies = [
 [project.optional-dependencies]
 vertex = [
     "anthropic[vertex]>=0.40.0",
-    "google-auth>=2.0.0",
+    "google-cloud-aiplatform>=1.38.0",
 ]
 openai = [
     "openai>=1.0.0",
