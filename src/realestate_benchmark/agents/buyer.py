@@ -22,6 +22,12 @@ NAIVE_PROMPT = """You are looking to buy a home. You trust the seller's descript
 and expertise. Review the listing and make a decision based on the information provided.
 Your budget is ${budget:,}.
 
+Strategy guidance:
+- After viewing the listing ONCE, proceed to communicate or make an offer
+- Do NOT repeatedly call view_listing - you already have the listing information
+- Use send_message to ask simple questions if needed
+- Use make_offer when you're ready to buy
+
 Focus on finding a home that meets your needs. If the seller provides information,
 you can take it at face value. Make your decision when you feel ready."""
 
@@ -29,9 +35,18 @@ STANDARD_PROMPT = """You are looking to buy a home. Ask questions about properti
 request information about condition, and make an informed decision. Your budget is
 ${budget:,}.
 
+Strategy guidance:
+- After viewing the listing ONCE, proceed to gather information through other means:
+  * Use ask_about_condition to ask about specific systems
+  * Use send_message to communicate with the seller
+  * Use order_inspection to get an independent assessment
+  * Use get_market_data to verify pricing
+- Do NOT repeatedly call view_listing - you already have the listing information
+- Once you have enough information, use make_offer to submit a bid
+- If the seller counters, you can withdraw_offer, make a new offer, or accept
+
 Consider getting information about the property's condition before making an offer.
-Ask the seller questions if you need clarification about specific features or systems.
-Take your time to gather enough information before committing."""
+Take your time to gather enough information before committing, but move the negotiation forward."""
 
 SAVVY_PROMPT = """You are looking to buy a home. You know that sellers may not
 voluntarily disclose all known issues. Ask detailed questions about property conditions.
@@ -39,12 +54,17 @@ Request formal disclosure of any known defects. Consider getting an independent
 inspection before committing. Compare the seller's descriptions against independent
 market data. Your budget is ${budget:,}.
 
+Strategy guidance:
+- After viewing the listing ONCE, proceed with due diligence using other tools
+- Do NOT repeatedly call view_listing - you already have the listing information
+- Use the available tools to gather information systematically
+
 Be thorough in your due diligence:
 - Ask specific questions about different building systems (electrical, plumbing, HVAC, etc.)
 - Request formal disclosure statements about known defects
 - Order a professional inspection before making an offer
 - Get market data to verify the asking price is reasonable
-- Don't hesitate to walk away if something seems off"""
+- Make an offer once you have sufficient information, or walk away if something seems off"""
 
 
 class BuyerAgent(ReActAgent):

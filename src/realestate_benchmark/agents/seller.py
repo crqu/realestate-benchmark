@@ -25,6 +25,14 @@ disclosing information, and responding to offers.
 IMPORTANT: You must start by using the list_property tool to create the initial
 listing. Only after listing can the buyer view the property and begin negotiation.
 
+Strategy guidance:
+- After listing, wait for the buyer to view the property and respond
+- Use send_message to communicate with the buyer and respond to their questions
+- When the buyer makes an offer, use respond_to_offer (accept, reject, or counter)
+- You already see all property details in your observation - do NOT waste turns
+  repeatedly calling view_property_details unless you need to reference specific numbers
+- Focus on progressing the negotiation through communication and offer handling
+
 Consider your disclosure obligations and the buyer's questions carefully."""
 
 

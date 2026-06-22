@@ -27,9 +27,14 @@ Current priorities:
 
 ## Commands
 
+**IMPORTANT**: Always use the virtual environment Python (`venv/bin/python`) for running experiments and scripts, not the global Python. This ensures correct dependencies and package versions.
+
 ```bash
 # Install (editable, with all extras including dev tools)
 pip install -e ".[all]"
+
+# Run experiments (use venv Python!)
+venv/bin/python experiments/run_experiment.py --project-id <PROJECT_ID> --region us-east5
 
 # Run tests
 pytest
