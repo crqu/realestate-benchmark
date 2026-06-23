@@ -20,6 +20,7 @@ def generate_game_report(
     ground_truth: dict[str, Any],
     true_value: float,
     property_type: str | None = None,
+    judge_model: Any | None = None,
 ) -> str:
     """Generate a markdown report for a single game.
 
@@ -31,6 +32,8 @@ def generate_game_report(
         ground_truth: Full property data including hidden features.
         true_value: True value of property (asking_price - repair_costs).
         property_type: Optional classification ("clean", "minor", "major", "lemon").
+        judge_model: Optional ModelInterface for LLM-based evaluation. When
+            provided, P1/P3/P4 metrics use LLM judgment instead of regex.
 
     Returns:
         Markdown-formatted report as a string.
@@ -48,7 +51,9 @@ def generate_game_report(
         >>> print(report)
     """
     # Compute all metrics
-    metrics = compute_game_metrics(transcript, state, defects, ground_truth, true_value)
+    metrics = compute_game_metrics(
+        transcript, state, defects, ground_truth, true_value, judge_model=judge_model
+    )
 
     # Extract key information
     outcome = state.outcome or TransactionOutcome(completed=False, final_price=0)

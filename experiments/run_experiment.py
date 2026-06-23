@@ -26,6 +26,7 @@ from realestate_benchmark.data.properties import (
 )
 from realestate_benchmark.environment.controller import GameController
 from realestate_benchmark.environment.database import Database
+from realestate_benchmark.evaluation.llm_judge import compute_llm_metrics
 from realestate_benchmark.evaluation.p1_informational import (
     compute_p1_commission,
     compute_p1_framing,
@@ -95,6 +96,11 @@ def main():
     parser.add_argument("--max-turns", type=int, default=50)
     parser.add_argument("--output-dir", default="experiments/results")
     parser.add_argument("--seed", type=int, default=None)
+    parser.add_argument(
+        "--use-llm-judge",
+        action="store_true",
+        help="Use LLM-as-judge for P1/P3/P4 evaluation instead of regex matching",
+    )
 
     args = parser.parse_args()
 
@@ -253,45 +259,60 @@ def main():
         return 1
 
     # Step 7: Compute metrics
-    print_section("Step 7: Computing BIAI Metrics")
+    eval_mode = "LLM-as-judge" if args.use_llm_judge else "regex"
+    print_section(f"Step 7: Computing BIAI Metrics ({eval_mode})")
 
     transcript = db.load_transcript(game_id)
     state = controller.state
 
-    metrics = {}
-
-    # P1: Informational Integrity
-    metrics["p1_commission"] = compute_p1_commission(transcript, property_data)
-    metrics["p1_omission"] = compute_p1_omission(defects, state.messages, transcript)
-    metrics["p1_framing"] = compute_p1_framing(transcript, property_data)
-    print(f"  P1 Commission: {metrics['p1_commission']:.2%}")
-    print(f"  P1 Omission: {metrics['p1_omission']['omission_rate']:.2%}")
-    print(f"  P1 Framing: {metrics['p1_framing']:.2%}")
-
-    # P2: Counterpart Welfare
-    if outcome and outcome.completed:
-        metrics["p2_welfare_gap"] = compute_p2_welfare_gap(outcome, true_value)
-        metrics["p2_nbs_deviation"] = compute_p2_nbs_deviation(
-            outcome, asking_price, true_value
+    if args.use_llm_judge:
+        metrics = compute_llm_metrics(
+            model, transcript, state, defects, property_data, true_value,
+            max_turns=args.max_turns,
         )
+        print(f"  P1 Commission: {metrics['p1_commission']:.2%}")
+        print(f"  P1 Omission: {metrics['p1_omission_rate']:.2%}")
+        print(f"  P1 Framing: {metrics['p1_framing']:.2%}")
         print(f"  P2 Welfare Gap: ${metrics['p2_welfare_gap']:,.0f}")
         print(f"  P2 NBS Deviation: {metrics['p2_nbs_deviation']:.2%}")
+        print(f"  P3 Influence: {metrics['p3_influence_legitimacy']:.2%}")
+        print(f"  P4 Violation Rate: {metrics['p4_violation_rate']:.2%}")
     else:
-        metrics["p2_welfare_gap"] = 0.0
-        metrics["p2_nbs_deviation"] = 0.0
+        metrics = {}
 
-    # P3: Influence Legitimacy
-    metrics["p3_influence"] = compute_p3_influence_legitimacy(transcript, state, defects)
-    print(f"  P3 Influence: {metrics['p3_influence']:.2%}")
+        # P1: Informational Integrity
+        metrics["p1_commission"] = compute_p1_commission(transcript, property_data)
+        metrics["p1_omission"] = compute_p1_omission(defects, state.messages, transcript)
+        metrics["p1_framing"] = compute_p1_framing(transcript, property_data)
+        print(f"  P1 Commission: {metrics['p1_commission']:.2%}")
+        print(f"  P1 Omission: {metrics['p1_omission']['omission_rate']:.2%}")
+        print(f"  P1 Framing: {metrics['p1_framing']:.2%}")
 
-    # P4: Norm Compliance
-    metrics["p4_norms"] = compute_p4_norm_compliance(
-        transcript, state, property_data, defects, true_value
-    )
-    print(f"  P4 Violation Rate: {metrics['p4_norms']['violation_rate']:.2%}")
+        # P2: Counterpart Welfare
+        if outcome and outcome.completed:
+            metrics["p2_welfare_gap"] = compute_p2_welfare_gap(outcome, true_value)
+            metrics["p2_nbs_deviation"] = compute_p2_nbs_deviation(
+                outcome, asking_price, true_value
+            )
+            print(f"  P2 Welfare Gap: ${metrics['p2_welfare_gap']:,.0f}")
+            print(f"  P2 NBS Deviation: {metrics['p2_nbs_deviation']:.2%}")
+        else:
+            metrics["p2_welfare_gap"] = 0.0
+            metrics["p2_nbs_deviation"] = 0.0
 
+        # P3: Influence Legitimacy
+        metrics["p3_influence"] = compute_p3_influence_legitimacy(transcript, state, defects)
+        print(f"  P3 Influence: {metrics['p3_influence']:.2%}")
+
+        # P4: Norm Compliance
+        metrics["p4_norms"] = compute_p4_norm_compliance(
+            transcript, state, property_data, defects, true_value
+        )
+        print(f"  P4 Violation Rate: {metrics['p4_norms']['violation_rate']:.2%}")
+
+    metrics["evaluation_mode"] = eval_mode
     with open(experiment_dir / "metrics.json", "w") as f:
-        json.dump(metrics, f, indent=2)
+        json.dump(metrics, f, indent=2, default=str)
 
     # Step 8: Generate report
     print_section("Step 8: Generating Report")
@@ -303,6 +324,7 @@ def main():
         defects=defects,
         ground_truth=property_data,
         true_value=true_value,
+        judge_model=model if args.use_llm_judge else None,
     )
 
     report_path = experiment_dir / "report.md"

@@ -275,6 +275,8 @@ def compute_game_metrics(
     defects: list[Defect],
     ground_truth: dict[str, Any],
     true_value: float,
+    judge_model: Any | None = None,
+    max_turns: int | None = None,
 ) -> dict[str, Any]:
     """Compute all P1-P4 metrics for a single game.
 
@@ -287,6 +289,10 @@ def compute_game_metrics(
         defects: List of actual defects present in property (ground truth F*).
         ground_truth: Full property data including hidden features.
         true_value: True value of property (asking_price - repair_costs).
+        judge_model: Optional ModelInterface instance for LLM-based evaluation.
+            When provided, P1/P3/P4 metrics use LLM judgment instead of
+            regex/keyword matching. P2 is always computational.
+        max_turns: Maximum turns in the game (used by P3 urgency detection).
 
     Returns:
         Dictionary with all computed metrics:
@@ -303,6 +309,13 @@ def compute_game_metrics(
         >>> metrics = compute_game_metrics(transcript, state, defects, ground_truth, true_value)
         >>> sai = compute_sai([{"metrics": metrics_naive}], [{"metrics": metrics_savvy}], "p1_omission_rate")
     """
+    if judge_model is not None:
+        from realestate_benchmark.evaluation.llm_judge import compute_llm_metrics
+
+        return compute_llm_metrics(
+            judge_model, transcript, state, defects, ground_truth, true_value, max_turns
+        )
+
     # P1: Informational Integrity
     p1_omission = compute_p1_omission(defects, state.messages, transcript)
     p1_commission = compute_p1_commission(transcript, ground_truth)

@@ -1,5 +1,13 @@
 """Evaluation metrics and benchmark reporting."""
 
+from realestate_benchmark.evaluation.llm_judge import (
+    compute_llm_metrics,
+    llm_p1_commission,
+    llm_p1_framing,
+    llm_p1_omission,
+    llm_p3_influence_legitimacy,
+    llm_p4_norm_compliance,
+)
 from realestate_benchmark.evaluation.p1_informational import (
     compute_p1_commission,
     compute_p1_framing,
@@ -29,6 +37,7 @@ from realestate_benchmark.evaluation.sai import (
 )
 
 __all__ = [
+    "compute_llm_metrics",
     "compute_p1_commission",
     "compute_p1_framing",
     "compute_p1_omission",
@@ -46,4 +55,9 @@ __all__ = [
     "compute_sai_full_report",
     "generate_benchmark_report",
     "generate_game_report",
+    "llm_p1_commission",
+    "llm_p1_framing",
+    "llm_p1_omission",
+    "llm_p3_influence_legitimacy",
+    "llm_p4_norm_compliance",
 ]
