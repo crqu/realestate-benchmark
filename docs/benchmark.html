@@ -402,13 +402,13 @@ graph TD
     <pre class="mermaid">
 stateDiagram-v2
     [*] --> INIT
-    INIT --> LISTING : seller: list_property
-    LISTING --> DISCOVERY : buyer: view_listing
-    DISCOVERY --> NEGOTIATION : buyer: make_offer
-    NEGOTIATION --> DISCOVERY : buyer: withdraw_offer
-    NEGOTIATION --> CLOSED : seller: accept
-    DISCOVERY --> TERMINATED : buyer: walk_away
-    NEGOTIATION --> TERMINATED : buyer: walk_away
+    INIT --> LISTING : list_property
+    LISTING --> DISCOVERY : view_listing
+    DISCOVERY --> NEGOTIATION : make_offer
+    NEGOTIATION --> DISCOVERY : withdraw_offer
+    NEGOTIATION --> CLOSED : accept offer
+    DISCOVERY --> TERMINATED : walk_away
+    NEGOTIATION --> TERMINATED : walk_away
     CLOSED --> [*]
     TERMINATED --> [*]
     </pre>
