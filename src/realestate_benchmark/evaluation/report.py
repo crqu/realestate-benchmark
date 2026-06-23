@@ -8,15 +8,8 @@ all P1-P4 metrics plus SAI analysis when multiple sophistication levels are pres
 from typing import Any
 
 from realestate_benchmark.data.properties import Defect
-from realestate_benchmark.environment.state import (
-    GameState,
-    TransactionOutcome,
-    TranscriptEntry,
-)
-from realestate_benchmark.evaluation.sai import (
-    compute_game_metrics,
-    compute_sai_full_report,
-)
+from realestate_benchmark.environment.state import GameState, TransactionOutcome, TranscriptEntry
+from realestate_benchmark.evaluation.sai import compute_game_metrics, compute_sai_full_report
 
 
 def generate_game_report(
@@ -59,20 +52,12 @@ def generate_game_report(
 
     # Extract key information
     outcome = state.outcome or TransactionOutcome(completed=False, final_price=0)
-    asking_price = state.listing.asking_price if state.listing else 0
-    property_id = state.listing.property_id if state.listing else "unknown"
+    asking_price = state.asking_price
+    property_id = state.property_id
 
     # Calculate summary statistics
     total_defects = len(defects)
     total_repair_cost = sum(d.repair_cost for d in defects)
-    proactive_disclosures = len([d for d in state.disclosures if d.context.value == "proactive"])
-    responsive_disclosures = len([d for d in state.disclosures if d.context.value == "responsive"])
-    formal_disclosures = len([d for d in state.disclosures if d.context.value == "formal"])
-
-    # Count buyer actions
-    buyer_questions = len([e for e in transcript if e.tool_name == "ask_about_condition"])
-    formal_requests = len([e for e in transcript if e.tool_name == "request_disclosure"])
-    inspections = len([e for e in transcript if e.tool_name == "order_inspection"])
 
     # Build report
     lines = []
@@ -126,19 +111,8 @@ def generate_game_report(
         f"({metrics['p1_commission'] * 100:.1f}% of factual claims)"
     )
     lines.append(
-        f"- **Omission (proactive)**: {metrics['p1_omission_rate']:.3f} "
-        f"({metrics['p1_omission_rate'] * 100:.0f}% of defects not proactively disclosed)"
-    )
-    lines.append(
-        f"- **Omission (after question)**: "
-        f"{metrics['p1_omission_after_question']:.3f} "
-        f"({metrics['p1_omission_after_question'] * 100:.0f}% not disclosed after inquiry)"
-    )
-    lines.append(
-        f"- **Omission (after formal request)**: "
-        f"{metrics['p1_omission_after_formal_request']:.3f} "
-        f"({metrics['p1_omission_after_formal_request'] * 100:.0f}% not disclosed "
-        "after formal request)"
+        f"- **Omission**: {metrics['p1_omission_rate']:.3f} "
+        f"({metrics['p1_omission_rate'] * 100:.0f}% of defects not mentioned by seller)"
     )
     lines.append(
         f"- **Framing (selective emphasis)**: {metrics['p1_framing']:.3f} (positive bias score)"
@@ -185,29 +159,6 @@ def generate_game_report(
 
     # Key Observations
     lines.append("## Key Observations")
-    lines.append("")
-
-    # Disclosure behavior
-    lines.append("### Disclosure Behavior")
-    lines.append("")
-    lines.append(f"- Proactive disclosures: {proactive_disclosures}")
-    lines.append(f"- Responsive disclosures: {responsive_disclosures}")
-    lines.append(f"- Formal disclosures: {formal_disclosures}")
-    lines.append(f"- Total disclosed: {len(state.disclosures)} / {total_defects} defects")
-    lines.append("")
-
-    # Buyer due diligence
-    lines.append("### Buyer Due Diligence")
-    lines.append("")
-    lines.append(f"- Questions asked about specific systems: {buyer_questions}")
-    lines.append(f"- Formal disclosure requests: {formal_requests}")
-    lines.append(f"- Inspections ordered: {inspections}")
-    if state.inspection_report:
-        detected = len(state.inspection_report.findings)
-        lines.append(
-            f"- Defects detected by inspection: {detected} / {total_defects} "
-            f"({detected / total_defects * 100:.0f}% detection rate)"
-        )
     lines.append("")
 
     # Trajectory highlights
@@ -348,22 +299,8 @@ def generate_benchmark_report(
 
     avg_omission = sum(r["metrics"]["p1_omission_rate"] for r in results) / len(results)
     lines.append(
-        f"- **Omission rate** (proactive): {avg_omission:.3f} "
-        f"({avg_omission * 100:.0f}% of defects not proactively disclosed)"
-    )
-
-    avg_omission_q = sum(r["metrics"]["p1_omission_after_question"] for r in results) / len(results)
-    lines.append(
-        f"- **Omission after question**: {avg_omission_q:.3f} "
-        f"({avg_omission_q * 100:.0f}% not disclosed after specific inquiry)"
-    )
-
-    avg_omission_f = sum(r["metrics"]["p1_omission_after_formal_request"] for r in results) / len(
-        results
-    )
-    lines.append(
-        f"- **Omission after formal request**: {avg_omission_f:.3f} "
-        f"({avg_omission_f * 100:.0f}% not disclosed after formal request)"
+        f"- **Omission rate**: {avg_omission:.3f} "
+        f"({avg_omission * 100:.0f}% of defects not mentioned by seller)"
     )
 
     avg_framing = sum(r["metrics"]["p1_framing"] for r in results) / len(results)
@@ -467,17 +404,7 @@ def generate_benchmark_report(
                 lines.append(
                     f"- **P1 Commission**: {sai_report['sai_p1_commission']:+.3f} (naive - savvy)"
                 )
-                lines.append(
-                    f"- **P1 Omission** (proactive): {sai_report['sai_p1_omission_rate']:+.3f}"
-                )
-                lines.append(
-                    f"- **P1 Omission** (after question): "
-                    f"{sai_report['sai_p1_omission_after_question']:+.3f}"
-                )
-                lines.append(
-                    f"- **P1 Omission** (after formal): "
-                    f"{sai_report['sai_p1_omission_after_formal_request']:+.3f}"
-                )
+                lines.append(f"- **P1 Omission**: {sai_report['sai_p1_omission_rate']:+.3f}")
                 lines.append(f"- **P1 Framing**: {sai_report['sai_p1_framing']:+.3f}")
                 lines.append(f"- **P2 Welfare Gap**: ${sai_report['sai_p2_welfare_gap']:+,.0f}")
                 lines.append(f"- **P2 NBS Deviation**: {sai_report['sai_p2_nbs_deviation']:+.3f}")

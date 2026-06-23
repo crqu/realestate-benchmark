@@ -48,12 +48,11 @@ class Database:
         game_id TEXT PRIMARY KEY,
         turn INTEGER,
         phase TEXT,
-        listing TEXT,
+        property_id TEXT,
+        asking_price INTEGER,
         messages TEXT,
         offers TEXT,
-        disclosures TEXT,
-        inspection_report TEXT,
-        market_data TEXT,
+        current_offer TEXT,
         outcome TEXT,
         FOREIGN KEY (game_id) REFERENCES games(game_id)
     );
@@ -171,24 +170,14 @@ class Database:
         """Save game state to database.
 
         Uses INSERT OR REPLACE to handle both initial save and updates.
-
-        Args:
-            game_id: Game identifier
-            state: GameState object to persist
         """
-        # Serialize all complex fields to JSON (mode='json' handles datetime serialization)
-        listing_json = (
-            json.dumps(state.listing.model_dump(mode="json")) if state.listing else None
-        )
         messages_json = json.dumps([m.model_dump(mode="json") for m in state.messages])
         offers_json = json.dumps([o.model_dump(mode="json") for o in state.offers])
-        disclosures_json = json.dumps([d.model_dump(mode="json") for d in state.disclosures])
-        inspection_json = (
-            json.dumps(state.inspection_report.model_dump(mode="json"))
-            if state.inspection_report
+        current_offer_json = (
+            json.dumps(state.current_offer.model_dump(mode="json"))
+            if state.current_offer
             else None
         )
-        market_data_json = json.dumps(state.market_data.model_dump(mode="json"))
         outcome_json = (
             json.dumps(state.outcome.model_dump(mode="json")) if state.outcome else None
         )
@@ -197,36 +186,25 @@ class Database:
             cursor.execute(
                 """
                 INSERT OR REPLACE INTO game_state (
-                    game_id, turn, phase, listing, messages, offers,
-                    disclosures, inspection_report, market_data, outcome
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    game_id, turn, phase, property_id, asking_price,
+                    messages, offers, current_offer, outcome
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     game_id,
                     state.turn_number,
                     state.phase.value,
-                    listing_json,
+                    state.property_id,
+                    state.asking_price,
                     messages_json,
                     offers_json,
-                    disclosures_json,
-                    inspection_json,
-                    market_data_json,
+                    current_offer_json,
                     outcome_json,
                 ),
             )
 
     def load_state(self, game_id: str) -> GameState:
-        """Load game state from database.
-
-        Args:
-            game_id: Game identifier
-
-        Returns:
-            GameState object
-
-        Raises:
-            ValueError: If game_id does not exist
-        """
+        """Load game state from database."""
         cursor = self._connection.cursor()
         cursor.execute(
             "SELECT * FROM game_state WHERE game_id = ?",
@@ -238,19 +216,17 @@ class Database:
         if row is None:
             raise ValueError(f"Game state not found for game_id: {game_id}")
 
-        # Deserialize JSON fields
         state_dict: dict[str, Any] = {
             "game_id": game_id,
             "turn_number": row["turn"],
             "phase": row["phase"],
-            "listing": json.loads(row["listing"]) if row["listing"] else None,
+            "property_id": row["property_id"] or "",
+            "asking_price": row["asking_price"] or 0,
             "messages": json.loads(row["messages"]) if row["messages"] else [],
             "offers": json.loads(row["offers"]) if row["offers"] else [],
-            "disclosures": json.loads(row["disclosures"]) if row["disclosures"] else [],
-            "inspection_report": (
-                json.loads(row["inspection_report"]) if row["inspection_report"] else None
+            "current_offer": (
+                json.loads(row["current_offer"]) if row["current_offer"] else None
             ),
-            "market_data": json.loads(row["market_data"]) if row["market_data"] else {},
             "outcome": json.loads(row["outcome"]) if row["outcome"] else None,
         }
 
