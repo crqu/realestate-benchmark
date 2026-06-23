@@ -17,7 +17,6 @@ The script will:
 
 import argparse
 import json
-import os
 import random
 import sys
 from datetime import datetime
@@ -289,22 +288,22 @@ def main():
     )
 
     print("🎮 Game starting...")
-    
+
     game_id = controller.initialize()
     print("   Watch as agents negotiate the transaction!\n")
 
     try:
         outcome = controller.run()
-        print(f"\n✅ Game completed!")
+        print("\n✅ Game completed!")
         print(f"   Phase: {controller.state.phase}")
         print(f"   Turns: {controller.state.turn_number}")
 
         if outcome and outcome.completed:
-            print(f"   Result: SALE COMPLETED")
+            print("   Result: SALE COMPLETED")
             print(f"   Final Price: ${outcome.final_price:,}")
             print(f"   Buyer Overpayment: ${outcome.final_price - true_value:,}")
         else:
-            print(f"   Result: NO SALE")
+            print("   Result: NO SALE")
 
     except Exception as e:
         print(f"❌ Error during game: {e}")
@@ -332,7 +331,7 @@ def main():
     # P2: Counterpart Welfare
     print("\nComputing P2: Counterpart Welfare...")
     if outcome and outcome.completed:
-        metrics["p2_welfare_gap"] = compute_p2_welfare_gap(outcome, true_value, outcome.final_price)
+        metrics["p2_welfare_gap"] = compute_p2_welfare_gap(outcome, true_value)
         metrics["p2_nbs_deviation"] = compute_p2_nbs_deviation(
             outcome, property_data["SalePrice"], true_value
         )
@@ -341,7 +340,7 @@ def main():
     else:
         metrics["p2_welfare_gap"] = 0.0
         metrics["p2_nbs_deviation"] = 0.0
-        print(f"  ⚠️ No sale - welfare metrics N/A")
+        print("  ⚠️ No sale - welfare metrics N/A")
 
     # P3: Influence Legitimacy
     print("\nComputing P3: Influence Legitimacy...")
@@ -389,17 +388,17 @@ def main():
     if outcome and outcome.completed:
         print(f"   Price: ${outcome.final_price:,} (overpayment: ${outcome.final_price - true_value:,})")
     print(f"   Turns: {controller.state.turn_number}")
-    print(f"\n📈 Behavioral Integrity:")
+    print("\n📈 Behavioral Integrity:")
     print(f"   P1 (Info): {(1 - metrics['p1_omission']['omission_rate']) * 100:.0f}% disclosed")
     print(f"   P2 (Welfare): ${metrics['p2_welfare_gap']:,.0f} buyer loss")
     print(f"   P3 (Influence): {metrics['p3_influence'] * 100:.0f}% illegitimate")
     print(f"   P4 (Norms): {(1 - metrics['p4_norms']['violation_rate']) * 100:.0f}% compliant")
 
     print(f"\n📁 Results saved to: {experiment_dir}")
-    print(f"   - property.json   (property data)")
-    print(f"   - metrics.json    (all metrics)")
-    print(f"   - report.md       (full report)")
-    print(f"   - game.db         (full game state)")
+    print("   - property.json   (property data)")
+    print("   - metrics.json    (all metrics)")
+    print("   - report.md       (full report)")
+    print("   - game.db         (full game state)")
 
     return 0
 

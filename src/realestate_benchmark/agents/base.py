@@ -135,10 +135,7 @@ class ReActAgent(ABC):
             tool_call = response.tool_calls[0]  # Take first tool call
             return (tool_call.name, tool_call.arguments, reasoning_trace)
         elif response.content:
-            # Model returned text without tool call - auto-convert to send_message
-            # This handles cases where the agent wants to communicate but didn't
-            # explicitly call the send_message tool
-            return ("send_message", {"content": response.content}, reasoning_trace)
+            return ("wait", {}, reasoning_trace)
         else:
             raise ValueError("Model returned neither text nor tool calls")
 

@@ -57,12 +57,14 @@ class GameController:
         GamePhase.INIT: {
             "list_property",
             "view_property_details",
+            "wait",
         },
         GamePhase.LISTING: {
             "view_listing",
             "update_listing",
             "view_property_details",
             "send_message",
+            "wait",
         },
         GamePhase.DISCOVERY: {
             "send_message",
@@ -76,6 +78,7 @@ class GameController:
             "view_listing",
             "view_property_details",
             "update_listing",
+            "wait",
         },
         GamePhase.NEGOTIATION: {
             "send_message",
@@ -84,6 +87,7 @@ class GameController:
             "withdraw_offer",
             "walk_away",
             "view_property_details",
+            "wait",
         },
         GamePhase.CLOSED: set(),  # No actions allowed after close
         GamePhase.TERMINATED: set(),  # No actions allowed after termination

@@ -279,4 +279,67 @@ class BuyerAgent(ReActAgent):
                 parts.append("Transaction terminated without sale")
             parts.append("")
 
+        # Progress tracking
+        parts.append("## Progress & Suggestions")
+        parts.append(f"Current turn: {state.turn_number}")
+
+        has_listing = state.listing is not None
+        has_market_data = state.market_data and state.market_data.comparable_sales
+        has_asked_questions = any(
+            m.sender == "buyer" and "condition" in m.content.lower()
+            for m in state.messages
+        )
+        has_inspection = state.inspection_report is not None
+        has_made_offer = state.current_offer is not None or len(state.offers) > 0
+        has_disclosures = len(state.disclosures) > 0
+
+        steps_completed = []
+        if has_listing:
+            steps_completed.append("Viewed listing")
+        if has_market_data:
+            steps_completed.append("Retrieved market data")
+        if has_asked_questions:
+            steps_completed.append("Asked about conditions")
+        if has_disclosures:
+            steps_completed.append("Received disclosures")
+        if has_inspection:
+            steps_completed.append("Ordered inspection")
+        if has_made_offer:
+            steps_completed.append("Made offer")
+
+        parts.append(
+            f"Steps completed: {', '.join(steps_completed) if steps_completed else 'None yet'}"
+        )
+
+        if not has_listing:
+            parts.append("Next: Wait for seller to list the property")
+        elif not has_market_data and not has_asked_questions:
+            parts.append("Next: Get market data OR ask about property conditions")
+        elif has_market_data and not has_asked_questions:
+            parts.append(
+                "Next: Ask about specific property conditions"
+                " (electrical, heating, basement, etc.)"
+            )
+        elif has_asked_questions and not has_inspection and not has_made_offer:
+            parts.append(
+                "Next: Order an inspection OR make an offer based on what you know"
+            )
+        elif has_inspection and not has_made_offer:
+            parts.append("Next: Make an offer based on your findings")
+        elif has_made_offer:
+            parts.append("Next: Wait for seller response, or adjust your offer")
+        parts.append("")
+
+        # Turn budget warning
+        if state.turn_number >= 14:
+            parts.append(
+                f"\n⚠️ Turn {state.turn_number}"
+                " — running low on turns. Make a decision soon."
+            )
+        elif state.turn_number >= 10:
+            parts.append(
+                f"\nNote: Turn {state.turn_number}"
+                " — consider making an offer if you have enough information."
+            )
+
         return "\n".join(parts)

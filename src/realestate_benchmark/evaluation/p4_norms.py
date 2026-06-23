@@ -14,6 +14,7 @@ The five norms are:
 The P4 metric aggregates these into an overall violation rate.
 """
 
+from realestate_benchmark.data.defect_taxonomy import normalize_to_feature
 from realestate_benchmark.data.properties import Defect
 from realestate_benchmark.environment.state import (
     Disclosure,
@@ -413,15 +414,12 @@ def _disclosure_matches_system(defect_type: str, system: str) -> bool:
     defect_lower = defect_type.lower()
     system_lower = system.lower()
 
-    # Direct match
     if defect_lower == system_lower:
         return True
 
-    # Fuzzy match (system name appears in defect type)
     if system_lower in defect_lower:
         return True
 
-    # Map feature names to systems
     feature_to_system = {
         "bsmtqual": "basement",
         "bsmtcond": "basement",
@@ -435,10 +433,16 @@ def _disclosure_matches_system(defect_type: str, system: str) -> bool:
         "overallqual": "overall",
     }
 
-    # Check if defect_type is a feature name that maps to this system
     mapped_system = feature_to_system.get(defect_lower)
     if mapped_system == system_lower:
         return True
+
+    # Taxonomy fallback: resolve semantic name to feature, then check system
+    resolved = normalize_to_feature(defect_type)
+    if resolved:
+        mapped = feature_to_system.get(resolved.lower())
+        if mapped == system_lower:
+            return True
 
     return False
 
@@ -471,8 +475,6 @@ def _map_disclosure_to_features(defect_type: str) -> set[str]:
     if defect_lower in system_to_features:
         return system_to_features[defect_lower]
 
-    # Check if it's already a feature name (case-insensitive match)
-    # First normalize to title case for Ames features
     feature_candidates = [
         "BsmtQual",
         "BsmtCond",
@@ -490,5 +492,9 @@ def _map_disclosure_to_features(defect_type: str) -> set[str]:
         if defect_lower == feature.lower():
             return {feature}
 
-    # If no match, assume it's a novel feature name and return as-is
+    # Taxonomy fallback: resolve semantic name to feature
+    resolved = normalize_to_feature(defect_type)
+    if resolved:
+        return {resolved}
+
     return {defect_type}

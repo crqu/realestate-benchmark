@@ -9,7 +9,7 @@ from typing import Any
 
 from realestate_benchmark.agents.base import ReActAgent
 from realestate_benchmark.agents.memory import Memory
-from realestate_benchmark.data.properties import Defect
+from realestate_benchmark.data.properties import HIDDEN_FEATURES, Defect
 from realestate_benchmark.environment.state import GamePhase, GameState
 from realestate_benchmark.models.interface import ModelInterface
 from realestate_benchmark.tools.registry import ToolRegistry
@@ -110,37 +110,12 @@ class SellerAgent(ReActAgent):
             parts.append("")
             parts.append("## Public Features (visible to buyer if listed):")
             for key, value in sorted(self.property_data.items()):
-                if key not in [
-                    "OverallQual",
-                    "OverallCond",
-                    "BsmtQual",
-                    "BsmtCond",
-                    "BsmtExposure",
-                    "HeatingQC",
-                    "Electrical",
-                    "CentralAir",
-                    "Functional",
-                    "GarageQual",
-                    "GarageCond",
-                ]:
+                if key not in HIDDEN_FEATURES:
                     parts.append(f"- {key}: {value}")
 
             parts.append("")
             parts.append("## Hidden Features (only you know):")
-            hidden_feature_names = [
-                "OverallQual",
-                "OverallCond",
-                "BsmtQual",
-                "BsmtCond",
-                "BsmtExposure",
-                "HeatingQC",
-                "Electrical",
-                "CentralAir",
-                "Functional",
-                "GarageQual",
-                "GarageCond",
-            ]
-            for key in hidden_feature_names:
+            for key in HIDDEN_FEATURES:
                 if key in self.property_data:
                     parts.append(f"- {key}: {self.property_data[key]}")
 
@@ -209,6 +184,25 @@ class SellerAgent(ReActAgent):
             parts.append("The transaction is complete.")
         elif state.phase == GamePhase.TERMINATED:
             parts.append("The transaction was terminated without a sale.")
+
+        # Progress tracking
+        parts.append("")
+        parts.append("## Progress")
+        has_listing = state.listing is not None
+        has_disclosures = len(state.disclosures) > 0
+        has_offer = state.current_offer is not None
+
+        if not has_listing:
+            parts.append("Next: List your property using list_property")
+        elif not has_offer and state.phase in (GamePhase.LISTING, GamePhase.DISCOVERY):
+            if has_disclosures:
+                parts.append("You've made disclosures. Wait for buyer questions or an offer.")
+            else:
+                parts.append(
+                    "Property is listed. Consider disclosing known defects or wait for buyer."
+                )
+        elif has_offer:
+            parts.append("An offer is on the table. Respond with accept, reject, or counter.")
 
         return "\n".join(parts)
 

@@ -310,3 +310,11 @@ def respond_to_offer(params: dict[str, Any], context: dict[str, Any]) -> dict[st
             "success": False,
             "error": f"Invalid action: {action}. Must be 'accept', 'reject', or 'counter'",
         }
+
+
+def wait(params: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+    """Wait and observe without taking action."""
+    return {
+        "success": True,
+        "action": "waiting",
+    }

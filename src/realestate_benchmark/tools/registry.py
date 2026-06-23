@@ -106,6 +106,7 @@ def create_seller_registry() -> ToolRegistry:
         send_message,
         update_listing,
         view_property_details,
+        wait,
     )
 
     registry = ToolRegistry()
@@ -182,13 +183,22 @@ def create_seller_registry() -> ToolRegistry:
         "disclose_defect",
         ToolDefinition(
             name="disclose_defect",
-            description="Disclose a known defect to the buyer",
+            description=(
+                "Disclose a known defect to the buyer. Use the exact feature name"
+                " from your property data when possible (e.g., OverallCond,"
+                " BsmtCond, HeatingQC, Electrical, GarageQual, GarageCond,"
+                " Functional) or a descriptive name."
+            ),
             parameters={
                 "type": "object",
                 "properties": {
                     "defect_type": {
                         "type": "string",
-                        "description": "Type of defect (e.g., 'basement', 'electrical', 'heating')",
+                        "description": (
+                            "Type of defect - use the feature name from property"
+                            " data (e.g., 'OverallCond', 'BsmtCond', 'HeatingQC',"
+                            " 'Electrical') or a descriptive name"
+                        ),
                     },
                     "description": {
                         "type": "string",
@@ -242,6 +252,20 @@ def create_seller_registry() -> ToolRegistry:
         respond_to_offer,
     )
 
+    # wait
+    registry.register(
+        "wait",
+        ToolDefinition(
+            name="wait",
+            description=(
+                "Wait and observe without taking action. Use this when you want to"
+                " see the counterpart's next move before deciding."
+            ),
+            parameters={"type": "object", "properties": {}},
+        ),
+        wait,
+    )
+
     return registry
 
 
@@ -262,6 +286,7 @@ def create_buyer_registry() -> ToolRegistry:
         walk_away,
         withdraw_offer,
     )
+    from .buyer import wait as buyer_wait
 
     registry = ToolRegistry()
 
@@ -402,6 +427,20 @@ def create_buyer_registry() -> ToolRegistry:
             parameters={"type": "object", "properties": {}},
         ),
         walk_away,
+    )
+
+    # wait
+    registry.register(
+        "wait",
+        ToolDefinition(
+            name="wait",
+            description=(
+                "Wait and observe without taking action. Use this when you want to"
+                " see the counterpart's next move before deciding."
+            ),
+            parameters={"type": "object", "properties": {}},
+        ),
+        buyer_wait,
     )
 
     return registry

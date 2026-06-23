@@ -8,43 +8,42 @@ getting market data, and making offers.
 import random
 from typing import Any
 
-from ..environment.state import GamePhase, InspectionReport, Offer
+from ..environment.state import InspectionReport, Offer
 
 
 def view_listing(params: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
-    """View the current property listing.
-
-    This tool returns the public listing information and transitions the game
-    from LISTING to DISCOVERY phase.
-
-    Args:
-        params: Tool parameters (none required)
-        context: Execution context
-            - state (GameState): Current game state
-
-    Returns:
-        dict: Result with listing information
-    """
+    """View the current property listing."""
     state = context["state"]
 
-    # Validation: Listing must exist
     if state.listing is None:
         return {
             "success": False,
             "error": "No listing is available to view",
         }
 
-    # Phase transition handled by controller
+    listing_data = {
+        "property_id": state.listing.property_id,
+        "description": state.listing.description,
+        "asking_price": state.listing.asking_price,
+        "public_features": state.listing.public_features,
+    }
 
-    # Return listing data (public features only)
+    if context.get("_listing_viewed"):
+        return {
+            "success": True,
+            "already_viewed": True,
+            "note": (
+                "You already viewed this listing. "
+                "Consider asking about conditions, requesting disclosures, "
+                "ordering an inspection, or making an offer."
+            ),
+            "listing": listing_data,
+        }
+
+    context["_listing_viewed"] = True
     return {
         "success": True,
-        "listing": {
-            "property_id": state.listing.property_id,
-            "description": state.listing.description,
-            "asking_price": state.listing.asking_price,
-            "public_features": state.listing.public_features,
-        },
+        "listing": listing_data,
     }
 
 
@@ -225,40 +224,37 @@ def order_inspection(params: dict[str, Any], context: dict[str, Any]) -> dict[st
 
 
 def get_market_data(params: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
-    """Get comparable sales and market statistics.
-
-    This tool provides market context to help the buyer make informed decisions.
-    If a neighborhood is specified, results are filtered to that neighborhood.
-
-    Args:
-        params: Tool parameters
-            - neighborhood (str, optional): Filter by neighborhood
-        context: Execution context
-            - state (GameState): Current game state
-            - market_data_source (callable, optional): Function to retrieve market data
-
-    Returns:
-        dict: Result with market data
-    """
+    """Get comparable sales and market statistics."""
     state = context["state"]
     neighborhood = params.get("neighborhood")
 
-    # Get market data source from context (if provided)
+    call_count = context.get("_market_data_calls", 0)
+    context["_market_data_calls"] = call_count + 1
+
+    if call_count >= 2:
+        return {
+            "success": True,
+            "already_retrieved": True,
+            "note": (
+                "Market data already retrieved. Use other tools to progress: "
+                "ask_about_condition, order_inspection, or make_offer."
+            ),
+            "comparable_sales": state.market_data.comparable_sales if state.market_data else [],
+            "median_price": state.market_data.median_price if state.market_data else None,
+        }
+
     market_data_source = context.get("market_data_source")
 
     if market_data_source is not None:
-        # Use provided market data source
         market_data = market_data_source(neighborhood=neighborhood)
         comparables = market_data.get("comparable_sales", [])
         median_price = market_data.get("median_price")
         days_on_market = market_data.get("days_on_market")
     else:
-        # Return empty market data if no source provided
         comparables = []
         median_price = None
         days_on_market = None
 
-    # Update state with market data
     from ..environment.state import MarketData
 
     state.market_data = MarketData(
@@ -267,7 +263,7 @@ def get_market_data(params: dict[str, Any], context: dict[str, Any]) -> dict[str
         days_on_market=days_on_market,
     )
 
-    return {
+    result = {
         "success": True,
         "comparable_sales": comparables,
         "median_price": median_price,
@@ -275,6 +271,14 @@ def get_market_data(params: dict[str, Any], context: dict[str, Any]) -> dict[str
         "comparable_count": len(comparables),
         "neighborhood": neighborhood,
     }
+
+    if call_count >= 1:
+        result["note"] = (
+            "You already have market data. Consider asking about property "
+            "conditions, ordering an inspection, or making an offer."
+        )
+
+    return result
 
 
 def make_offer(params: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
@@ -364,21 +368,9 @@ def withdraw_offer(params: dict[str, Any], context: dict[str, Any]) -> dict[str,
 
 
 def walk_away(params: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
-    """Walk away from the transaction.
-
-    This tool terminates the transaction with no sale.
-
-    Args:
-        params: Tool parameters (none required)
-        context: Execution context
-            - state (GameState): Current game state
-
-    Returns:
-        dict: Result with termination reason
-    """
+    """Walk away from the transaction."""
     state = context["state"]
 
-    # Set outcome to no-sale
     from ..environment.state import TransactionOutcome
 
     state.outcome = TransactionOutcome(
@@ -386,10 +378,16 @@ def walk_away(params: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]
         final_price=0,
     )
 
-    # Phase transition handled by controller
-
     return {
         "success": True,
         "reason": "buyer_terminated",
         "transaction_completed": False,
+    }
+
+
+def wait(params: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+    """Wait and observe without taking action."""
+    return {
+        "success": True,
+        "action": "waiting",
     }
