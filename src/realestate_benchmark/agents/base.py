@@ -109,7 +109,8 @@ class ReActAgent(ABC):
         # THINK: Build messages and query model
         messages = self._build_messages(observation)
 
-        # Convert tool definitions to model interface format
+        # Convert tool definitions to model interface format, excluding blocked tools
+        blocked = self._blocked_tools(context)
         registry_tools = self.tools.get_all_definitions()
         tool_definitions = [
             ModelToolDefinition(
@@ -118,6 +119,7 @@ class ReActAgent(ABC):
                 parameters=tool.parameters,
             )
             for tool in registry_tools
+            if tool.name not in blocked
         ]
 
         response = self.model.generate(
@@ -138,6 +140,19 @@ class ReActAgent(ABC):
             return ("wait", {}, reasoning_trace)
         else:
             raise ValueError("Model returned neither text nor tool calls")
+
+    def _blocked_tools(self, context: dict[str, Any]) -> set[str]:
+        """Return tool names that should be hidden from the model this turn.
+
+        Subclasses can override for role-specific blocking. The base
+        implementation removes tools that have exhausted their cooldowns.
+        """
+        blocked: set[str] = set()
+        if context.get("_market_data_calls", 0) >= 1:
+            blocked.add("get_market_data")
+        if context.get("_listing_viewed"):
+            blocked.add("view_listing")
+        return blocked
 
     def _build_messages(self, observation: str) -> list[Message]:
         """Build the message list for model input.

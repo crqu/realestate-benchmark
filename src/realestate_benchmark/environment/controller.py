@@ -252,12 +252,26 @@ class GameController:
                 print(f"Turn {self.state.turn_number} ({agent_id}): Timeout after {elapsed_ms}ms")
                 return False
 
-            # Validate action against current phase
+            # Validate action against current phase — treat invalid as a skipped turn
             if not self.validate_action(agent_id, tool_name, parameters):
                 print(
-                    f"Turn {self.state.turn_number} ({agent_id}): Invalid action '{tool_name}' in phase {self.state.phase}"
+                    f"Turn {self.state.turn_number} ({agent_id}): "
+                    f"Invalid action '{tool_name}' in phase {self.state.phase}"
+                    f" — treating as wait"
                 )
-                return False
+                tool_name = "wait"
+                parameters = {}
+                result = {"success": True, "action": "waiting", "skipped": True}
+
+                self.log_action(
+                    agent_id=agent_id,
+                    tool_name=tool_name,
+                    parameters=parameters,
+                    result=result,
+                    reasoning_trace=reasoning_trace,
+                    time_ms=elapsed_ms,
+                )
+                return True
 
             # Add state to context for tool execution
             self.context["state"] = self.state

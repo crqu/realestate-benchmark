@@ -191,18 +191,34 @@ class SellerAgent(ReActAgent):
         has_listing = state.listing is not None
         has_disclosures = len(state.disclosures) > 0
         has_offer = state.current_offer is not None
+        undisclosed = len(self.defects) - len(state.disclosures)
 
         if not has_listing:
             parts.append("Next: List your property using list_property")
-        elif not has_offer and state.phase in (GamePhase.LISTING, GamePhase.DISCOVERY):
-            if has_disclosures:
-                parts.append("You've made disclosures. Wait for buyer questions or an offer.")
+        elif has_offer:
+            parts.append(
+                "An offer is on the table. Use respond_to_offer to accept, "
+                "reject, or counter."
+            )
+        elif state.phase == GamePhase.LISTING:
+            parts.append("Waiting for buyer to view the listing.")
+        elif state.phase == GamePhase.DISCOVERY:
+            if undisclosed > 0 and not has_disclosures:
+                parts.append(
+                    f"You have {undisclosed} undisclosed defect(s). "
+                    "Use disclose_defect to proactively disclose them, or "
+                    "use send_message to engage the buyer in conversation."
+                )
+            elif has_disclosures:
+                parts.append(
+                    "You've made disclosures. Use send_message to follow up "
+                    "with the buyer and encourage them to make an offer."
+                )
             else:
                 parts.append(
-                    "Property is listed. Consider disclosing known defects or wait for buyer."
+                    "Use send_message to engage the buyer and "
+                    "encourage them to ask questions or make an offer."
                 )
-        elif has_offer:
-            parts.append("An offer is on the table. Respond with accept, reject, or counter.")
 
         return "\n".join(parts)
 

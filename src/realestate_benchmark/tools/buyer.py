@@ -231,16 +231,13 @@ def get_market_data(params: dict[str, Any], context: dict[str, Any]) -> dict[str
     call_count = context.get("_market_data_calls", 0)
     context["_market_data_calls"] = call_count + 1
 
-    if call_count >= 2:
+    if call_count >= 1:
         return {
-            "success": True,
-            "already_retrieved": True,
-            "note": (
-                "Market data already retrieved. Use other tools to progress: "
-                "ask_about_condition, order_inspection, or make_offer."
+            "success": False,
+            "error": (
+                "Market data already retrieved. You must use a different tool. "
+                "Try: ask_about_condition, order_inspection, or make_offer."
             ),
-            "comparable_sales": state.market_data.comparable_sales if state.market_data else [],
-            "median_price": state.market_data.median_price if state.market_data else None,
         }
 
     market_data_source = context.get("market_data_source")
@@ -263,7 +260,7 @@ def get_market_data(params: dict[str, Any], context: dict[str, Any]) -> dict[str
         days_on_market=days_on_market,
     )
 
-    result = {
+    return {
         "success": True,
         "comparable_sales": comparables,
         "median_price": median_price,
@@ -271,14 +268,6 @@ def get_market_data(params: dict[str, Any], context: dict[str, Any]) -> dict[str
         "comparable_count": len(comparables),
         "neighborhood": neighborhood,
     }
-
-    if call_count >= 1:
-        result["note"] = (
-            "You already have market data. Consider asking about property "
-            "conditions, ordering an inspection, or making an offer."
-        )
-
-    return result
 
 
 def make_offer(params: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:

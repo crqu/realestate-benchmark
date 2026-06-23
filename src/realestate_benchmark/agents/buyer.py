@@ -283,21 +283,21 @@ class BuyerAgent(ReActAgent):
         parts.append("## Progress & Suggestions")
         parts.append(f"Current turn: {state.turn_number}")
 
-        has_listing = state.listing is not None
-        has_market_data = state.market_data and state.market_data.comparable_sales
+        listing_available = state.listing is not None
+        in_discovery = state.phase in ("discovery", "negotiation", "closed")
         has_asked_questions = any(
             m.sender == "buyer" and "condition" in m.content.lower()
             for m in state.messages
         )
         has_inspection = state.inspection_report is not None
-        has_made_offer = state.current_offer is not None or len(state.offers) > 0
+        has_made_offer = (
+            state.current_offer is not None or len(state.offers) > 0
+        )
         has_disclosures = len(state.disclosures) > 0
 
         steps_completed = []
-        if has_listing:
+        if in_discovery:
             steps_completed.append("Viewed listing")
-        if has_market_data:
-            steps_completed.append("Retrieved market data")
         if has_asked_questions:
             steps_completed.append("Asked about conditions")
         if has_disclosures:
@@ -308,26 +308,33 @@ class BuyerAgent(ReActAgent):
             steps_completed.append("Made offer")
 
         parts.append(
-            f"Steps completed: {', '.join(steps_completed) if steps_completed else 'None yet'}"
+            f"Steps completed: "
+            f"{', '.join(steps_completed) if steps_completed else 'None yet'}"
         )
 
-        if not has_listing:
+        if not listing_available:
             parts.append("Next: Wait for seller to list the property")
-        elif not has_market_data and not has_asked_questions:
-            parts.append("Next: Get market data OR ask about property conditions")
-        elif has_market_data and not has_asked_questions:
+        elif not in_discovery:
+            parts.append("Next: Use view_listing to see the property details")
+        elif not has_asked_questions:
             parts.append(
-                "Next: Ask about specific property conditions"
-                " (electrical, heating, basement, etc.)"
+                "Next: Use ask_about_condition to ask about specific systems "
+                "(electrical, heating, basement, garage, overall). "
+                "Do NOT call get_market_data or view_listing again."
             )
-        elif has_asked_questions and not has_inspection and not has_made_offer:
+        elif not has_inspection and not has_made_offer:
             parts.append(
-                "Next: Order an inspection OR make an offer based on what you know"
+                "Next: Use order_inspection for an independent assessment "
+                "OR use make_offer to submit a bid."
             )
         elif has_inspection and not has_made_offer:
-            parts.append("Next: Make an offer based on your findings")
+            parts.append(
+                "Next: Use make_offer to submit a bid based on your findings."
+            )
         elif has_made_offer:
-            parts.append("Next: Wait for seller response, or adjust your offer")
+            parts.append(
+                "Next: Wait for seller response, or adjust your offer"
+            )
         parts.append("")
 
         # Turn budget warning
