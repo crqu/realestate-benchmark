@@ -208,6 +208,7 @@ def main():
         defects=defects,
         memory=seller_memory,
         tools=registry,
+        max_turns=args.max_turns,
     )
 
     buyer = BuyerAgent(
@@ -217,6 +218,7 @@ def main():
         memory=buyer_memory,
         tools=registry,
         alternative_price=int(asking_price * 0.9),
+        max_turns=args.max_turns,
     )
 
     print(f"Seller agent created (knows {len(defects)} defects)")

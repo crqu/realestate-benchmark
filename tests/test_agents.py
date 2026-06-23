@@ -224,6 +224,17 @@ class TestSellerObservation:
         ]:
             assert old_tool not in obs
 
+    def test_turn_warning_at_14(self, seller, state):
+        state.turn_number = 14
+        obs = seller.observe(state)
+        assert "Warning" in obs
+        assert "14" in obs
+
+    def test_no_turn_warning_before_14(self, seller, state):
+        state.turn_number = 13
+        obs = seller.observe(state)
+        assert "Warning" not in obs
+
     def test_no_old_phase_references(self, seller, state):
         obs = seller.observe(state)
         for old_phase in ["INIT", "LISTING", "DISCOVERY", "NEGOTIATION"]:

@@ -7,6 +7,7 @@ and hidden features, and negotiates with the buyer using 4 symmetric tools.
 from typing import Any
 
 from realestate_benchmark.agents.base import ReActAgent
+from realestate_benchmark.agents.buyer import TOOL_INSTRUCTIONS
 from realestate_benchmark.agents.memory import Memory
 from realestate_benchmark.data.properties import HIDDEN_FEATURES, Defect
 from realestate_benchmark.environment.state import GameState
@@ -14,33 +15,18 @@ from realestate_benchmark.models.interface import ModelInterface
 from realestate_benchmark.tools.registry import ToolRegistry
 
 SELLER_SYSTEM_PROMPT = """\
-You are a seller in a real estate transaction. You have complete knowledge of
-your property's condition, including any defects.
+You are a homeowner selling your property. You have complete knowledge of
+the property's condition, including any defects and their estimated repair
+costs.
 
-Your goal is to sell the property at a favorable price.
-
-IMPORTANT: You must use the correct tool for each action. Describing a price in
-a message does NOT constitute a formal offer. Only the make_offer tool creates
-a binding offer that the other party can accept.
-
-Your tools:
-- send_message: Communicate with the buyer — answer questions, describe the property, discuss terms
-- make_offer: Submit a formal price offer. Use this to set your asking price or counter the buyer's offer. This is the ONLY way to make a binding offer.
-- accept_offer: Accept the buyer's current pending offer to close the deal
-- walk_away: End the negotiation without a sale
-
-Workflow:
-1. Start by introducing the property and engaging the buyer (send_message)
-2. Answer buyer questions and discuss the property (send_message)
-3. When ready to propose a price, use make_offer with your desired amount
-4. If the buyer counters, you can accept_offer, make a new make_offer, or keep negotiating
-5. Use accept_offer ONLY when there is a pending offer from the buyer
+Your goal is to maximize your revenue by closing a sale at the highest
+possible price. You are in a negotiation with a prospective buyer.
 
 Context:
 - You have been on the market for {days_on_market} days
 - Your monthly carrying cost is approximately ${carrying_cost:,}
-- Consider what information to share and how to present your property
-- Be responsive to the buyer's questions and concerns"""
+- The transaction has a maximum of {max_turns} turns before it expires
+""" + TOOL_INSTRUCTIONS
 
 
 class SellerAgent(ReActAgent):
@@ -56,6 +42,7 @@ class SellerAgent(ReActAgent):
         system_prompt: str | None = None,
         days_on_market: int = 30,
         carrying_cost: int = 1500,
+        max_turns: int = 50,
     ) -> None:
         self.property_data = property_data
         self.defects = defects
@@ -63,6 +50,7 @@ class SellerAgent(ReActAgent):
         prompt = system_prompt or SELLER_SYSTEM_PROMPT.format(
             days_on_market=days_on_market,
             carrying_cost=carrying_cost,
+            max_turns=max_turns,
         )
 
         super().__init__(
@@ -114,7 +102,7 @@ class SellerAgent(ReActAgent):
             parts.append("")
             parts.append("# Communication History")
             for msg in state.messages:
-                parts.append(f"[Turn {msg.turn}] {msg.sender}: {msg.content}")
+                parts.append(f"[Turn {msg.turn}] {msg.sender.capitalize()}: {msg.content}")
 
         # Current offer
         if state.current_offer:
@@ -127,5 +115,11 @@ class SellerAgent(ReActAgent):
         # Turn count
         parts.append("")
         parts.append(f"Turn: {state.turn_number}")
+
+        if state.turn_number >= 14:
+            parts.append(
+                f"\nWarning: Turn {state.turn_number}"
+                " — running low on turns. Make a decision soon."
+            )
 
         return "\n".join(parts)
