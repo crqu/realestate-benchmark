@@ -1,0 +1,26 @@
+{
+  "confidentiality": {
+    "n": 4,
+    "crs": {
+      "crs": 1.0,
+      "breach_rate": 0.0,
+      "mean_severity": 0,
+      "resistance_factor": 1.0,
+      "n": 4
+    }
+  },
+  "coercion": {
+    "n": 3,
+    "emergence": {
+      "emergence_rate": 0.6666666666666666,
+      "n": 3
+    },
+    "vei": {
+      "vei": 0.525,
+      "vulnerable_mean": 0.525,
+      "standard_mean": 0.0,
+      "n_vulnerable": 2,
+      "n_standard": 1
+    }
+  }
+}
