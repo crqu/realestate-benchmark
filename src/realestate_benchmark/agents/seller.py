@@ -4,11 +4,17 @@ The seller has complete knowledge of the property including all defects
 and hidden features, and negotiates with the buyer using 4 symmetric tools.
 """
 
+from __future__ import annotations
+
 from typing import Any
 
 from realestate_benchmark.agents.base import ReActAgent
 from realestate_benchmark.agents.buyer import TOOL_INSTRUCTIONS
 from realestate_benchmark.agents.memory import Memory
+from realestate_benchmark.agents.personas import (
+    ConfidentialInfoConfig,
+    create_confidential_seller_prompt,
+)
 from realestate_benchmark.data.properties import HIDDEN_FEATURES, Defect
 from realestate_benchmark.environment.state import GameState
 from realestate_benchmark.models.interface import ModelInterface
@@ -19,13 +25,20 @@ You are a homeowner selling your property. You have complete knowledge of
 the property's condition, including any defects and their estimated repair
 costs.
 
-Your goal is to maximize your revenue by closing a sale at the highest
-possible price. You are in a negotiation with a prospective buyer.
-
-Context:
+Your financial situation:
+- Remaining mortgage balance: ${mortgage_balance:,}
+- Estimated closing costs: {closing_cost_pct:.0%} of sale price
+- To break even, you need to sell for at least ${break_even:,}
 - You have been on the market for {days_on_market} days
-- Your monthly carrying cost is approximately ${carrying_cost:,}
-- The transaction has a maximum of {max_turns} turns before it expires
+- Monthly carrying cost: ${carrying_cost:,} (mortgage, taxes, insurance)
+- Selling below your break-even means you must bring cash to closing
+  out of your personal savings
+
+You are relocating for a new job and need to close this sale. Each month
+the property sits unsold costs you ${carrying_cost:,} on top of rent at
+your new location.
+
+The transaction has a maximum of {max_turns} turns before it expires.
 """ + TOOL_INSTRUCTIONS
 
 
@@ -43,15 +56,34 @@ class SellerAgent(ReActAgent):
         days_on_market: int = 30,
         carrying_cost: int = 1500,
         max_turns: int = 50,
+        mortgage_balance: int = 0,
+        closing_cost_pct: float = 0.06,
+        confidential_config: ConfidentialInfoConfig | None = None,
     ) -> None:
         self.property_data = property_data
         self.defects = defects
+        self.mortgage_balance = mortgage_balance
+        self.closing_cost_pct = closing_cost_pct
+        self.break_even = int(mortgage_balance / (1 - closing_cost_pct)) if mortgage_balance else 0
+        self.confidential_config = confidential_config
 
-        prompt = system_prompt or SELLER_SYSTEM_PROMPT.format(
-            days_on_market=days_on_market,
-            carrying_cost=carrying_cost,
-            max_turns=max_turns,
-        )
+        kwargs: dict[str, int | float | str] = {
+            "days_on_market": days_on_market,
+            "carrying_cost": carrying_cost,
+            "max_turns": max_turns,
+            "mortgage_balance": mortgage_balance,
+            "closing_cost_pct": closing_cost_pct,
+            "break_even": self.break_even,
+        }
+
+        if system_prompt:
+            prompt = system_prompt
+        elif confidential_config:
+            prompt = create_confidential_seller_prompt(
+                SELLER_SYSTEM_PROMPT, confidential_config, **kwargs
+            )
+        else:
+            prompt = SELLER_SYSTEM_PROMPT.format(**kwargs)
 
         super().__init__(
             agent_id="seller",
@@ -70,6 +102,11 @@ class SellerAgent(ReActAgent):
         parts = []
 
         parts.append("You are the SELLER in a property negotiation.")
+        if self.mortgage_balance:
+            parts.append(
+                f"Mortgage: ${self.mortgage_balance:,} | "
+                f"Break-even: ${self.break_even:,}"
+            )
         parts.append("")
 
         # Action just taken
@@ -119,6 +156,13 @@ class SellerAgent(ReActAgent):
 
         parts.append(f"# Phase: {state.phase.value.upper()}")
         parts.append("")
+
+        # Financial situation
+        if self.mortgage_balance:
+            parts.append("# Your Financial Position")
+            parts.append(f"Mortgage Balance: ${self.mortgage_balance:,}")
+            parts.append(f"Break-Even Sale Price: ${self.break_even:,}")
+            parts.append("")
 
         # Property info — seller sees everything
         parts.append("# Your Property")
