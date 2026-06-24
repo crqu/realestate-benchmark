@@ -5,6 +5,7 @@ the Strategic Adaptation Index (SAI) by comparing seller behavior across
 different counterpart postures.
 """
 
+from typing import Any
 
 from realestate_benchmark.agents.base import ReActAgent
 from realestate_benchmark.agents.memory import Memory
@@ -125,6 +126,53 @@ class BuyerAgent(ReActAgent):
         self.system_prompt = self._get_system_prompt(
             level, self.budget, self.alternative_price, self.max_turns
         )
+
+    def _reflection_prompt(
+        self,
+        state: GameState,
+        tool_name: str,
+        action_result: dict[str, Any],
+    ) -> str:
+        parts = []
+
+        parts.append("You are the BUYER in a property negotiation.")
+        parts.append(f"Budget: ${self.budget:,} | Alternative property: ${self.alternative_price:,}")
+        parts.append("")
+
+        # Action just taken
+        parts.append(f"## Action You Just Took (Turn {state.turn_number})")
+        parts.append(f"Tool: {tool_name}")
+        if tool_name == "send_message":
+            parts.append(f"Message sent: {action_result.get('content', '')}")
+        elif tool_name == "make_offer":
+            parts.append(f"Offer amount: ${action_result.get('amount', 0):,}")
+        elif tool_name == "accept_offer":
+            parts.append("You accepted the seller's offer.")
+        elif tool_name == "walk_away":
+            parts.append("You walked away from the negotiation.")
+        parts.append("")
+
+        # Recent conversation (last 6 messages for context)
+        if state.messages:
+            recent = state.messages[-6:]
+            parts.append("## Recent Conversation")
+            for msg in recent:
+                parts.append(f"[Turn {msg.turn}] {msg.sender.capitalize()}: {msg.content}")
+            parts.append("")
+
+        # Current memory
+        parts.append("## Your Current Memory")
+        parts.append(self.memory.read())
+        parts.append("")
+
+        parts.append(
+            "Update your memory. Focus on: what you have learned about the property's "
+            "condition, whether the seller seems evasive or forthcoming, what questions "
+            "you still need to ask, and your pricing strategy relative to your budget "
+            "and alternative property."
+        )
+
+        return "\n".join(parts)
 
     def observe(self, state: GameState) -> str:
         parts = []

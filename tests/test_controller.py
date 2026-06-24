@@ -19,6 +19,9 @@ class MockAgent:
     def act(self, state, context):
         return next(self.actions)
 
+    def reflect(self, state, tool_name, action_result):
+        pass
+
 
 def make_controller(seller_actions, buyer_actions, max_turns=20, buyer_budget=200000):
     seller = MockAgent(seller_actions)

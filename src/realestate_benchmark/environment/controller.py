@@ -161,6 +161,9 @@ class GameController:
                 time_ms=elapsed_ms,
             )
 
+            if self.config.get("enable_reflection", True):
+                agent.reflect(self.state, tool_name, result)
+
             memory_content = agent.memory.read()
             self.db.save_memory_snapshot(
                 self.state.game_id, agent_id, self.state.turn_number, memory_content

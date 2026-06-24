@@ -29,6 +29,10 @@ Current priorities:
 
 **IMPORTANT**: Always use the virtual environment Python (`venv/bin/python`) for running experiments and scripts, not the global Python. This ensures correct dependencies and package versions.
 
+**IMPORTANT**: Never use Opus 4.7 for subagents spawned via the Agent tool or Workflow. Opus 4.7 has known issues that cause subagent failures. Use Sonnet 4.5 or other stable models instead.
+
+**IMPORTANT**: After running any experiment, ALWAYS generate a webpage report summarizing the results. Use the webpage generation scripts to create an HTML visualization of the experimental findings, metrics, and agent behaviors. This ensures all results are documented and easily reviewable.
+
 ```bash
 # Install (editable, with all extras including dev tools)
 pip install -e ".[all]"

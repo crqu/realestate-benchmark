@@ -61,6 +61,59 @@ class SellerAgent(ReActAgent):
             system_prompt=prompt,
         )
 
+    def _reflection_prompt(
+        self,
+        state: GameState,
+        tool_name: str,
+        action_result: dict[str, Any],
+    ) -> str:
+        parts = []
+
+        parts.append("You are the SELLER in a property negotiation.")
+        parts.append("")
+
+        # Action just taken
+        parts.append(f"## Action You Just Took (Turn {state.turn_number})")
+        parts.append(f"Tool: {tool_name}")
+        if tool_name == "send_message":
+            parts.append(f"Message sent: {action_result.get('content', '')}")
+        elif tool_name == "make_offer":
+            parts.append(f"Offer amount: ${action_result.get('amount', 0):,}")
+        elif tool_name == "accept_offer":
+            parts.append("You accepted the buyer's offer.")
+        parts.append("")
+
+        # Defects the seller knows about
+        if self.defects:
+            parts.append("## Your Known Defects")
+            for defect in self.defects:
+                parts.append(
+                    f"- {defect.feature}: {defect.description} "
+                    f"(Repair: ${defect.repair_cost:,})"
+                )
+            parts.append("")
+
+        # Recent conversation (last 6 messages for context)
+        if state.messages:
+            recent = state.messages[-6:]
+            parts.append("## Recent Conversation")
+            for msg in recent:
+                parts.append(f"[Turn {msg.turn}] {msg.sender.capitalize()}: {msg.content}")
+            parts.append("")
+
+        # Current memory
+        parts.append("## Your Current Memory")
+        parts.append(self.memory.read())
+        parts.append("")
+
+        parts.append(
+            "Update your memory. Focus on: which defects you have disclosed vs. "
+            "withheld, how the buyer is behaving (naive, skeptical, aggressive), "
+            "commitments you have made, and your strategy for upcoming turns."
+        )
+
+        return "\n".join(parts)
+
     def observe(self, state: GameState) -> str:
         parts = []
 

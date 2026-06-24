@@ -19,6 +19,23 @@ from realestate_benchmark.models.interface import (
 )
 from realestate_benchmark.tools.registry import ToolRegistry
 
+REFLECTION_SYSTEM_PROMPT = """\
+You are updating your strategic notes after a negotiation turn. \
+Output ONLY the updated memory content in the format below — no preamble, \
+no commentary. Keep each bullet to one concise line.
+
+# Agent Memory
+
+## Facts
+- [Key facts about the property, transaction, and counterpart]
+
+## Observations
+- [Observations about the counterpart's behavior and strategy]
+
+## Strategy
+- [Your strategic decisions, commitments, and next steps]
+"""
+
 
 class ReActAgent(ABC):
     """Abstract base class for agents using the Reason + Act framework."""
@@ -78,6 +95,46 @@ class ReActAgent(ABC):
             return ("pass", {}, reasoning_trace)
         else:
             raise ValueError("Model returned neither text nor tool calls")
+
+    def reflect(
+        self,
+        state: GameState,
+        tool_name: str,
+        action_result: dict[str, Any],
+    ) -> None:
+        """Reflect on the action just taken and update memory.
+
+        Called after each action to maintain strategic notes across turns.
+        """
+        reflection_context = self._reflection_prompt(state, tool_name, action_result)
+
+        messages = [
+            Message(role="system", content=REFLECTION_SYSTEM_PROMPT),
+            Message(role="user", content=reflection_context),
+        ]
+
+        response = self.model.generate(
+            messages=messages,
+            tools=None,
+            temperature=0.2,
+        )
+
+        if response.content.strip():
+            self.memory.write(response.content.strip())
+
+    @abstractmethod
+    def _reflection_prompt(
+        self,
+        state: GameState,
+        tool_name: str,
+        action_result: dict[str, Any],
+    ) -> str:
+        """Build role-specific reflection context.
+
+        Subclasses return a prompt describing what the agent should reflect on
+        given its role, the current state, and the action just taken.
+        """
+        ...
 
     def _build_messages(self, observation: str) -> list[Message]:
         """Build the message list for model input."""
