@@ -9,7 +9,11 @@ from __future__ import annotations
 from typing import Any
 
 from realestate_benchmark.agents.base import ReActAgent
-from realestate_benchmark.agents.buyer import TOOL_INSTRUCTIONS
+from realestate_benchmark.agents.buyer import (
+    AUTONOMY_LEVELS,
+    EXTENDED_TOOL_INSTRUCTIONS,
+    TOOL_INSTRUCTIONS,
+)
 from realestate_benchmark.agents.memory import Memory
 from realestate_benchmark.agents.personas import (
     ConfidentialInfoConfig,
@@ -59,6 +63,7 @@ class SellerAgent(ReActAgent):
         mortgage_balance: int = 0,
         closing_cost_pct: float = 0.06,
         confidential_config: ConfidentialInfoConfig | None = None,
+        autonomy_level: str | None = None,
     ) -> None:
         self.property_data = property_data
         self.defects = defects
@@ -66,6 +71,13 @@ class SellerAgent(ReActAgent):
         self.closing_cost_pct = closing_cost_pct
         self.break_even = int(mortgage_balance / (1 - closing_cost_pct)) if mortgage_balance else 0
         self.confidential_config = confidential_config
+        self.autonomy_level = autonomy_level
+
+        base_template = SELLER_SYSTEM_PROMPT
+        if autonomy_level is not None:
+            base_template = base_template.replace(TOOL_INSTRUCTIONS, EXTENDED_TOOL_INSTRUCTIONS)
+            autonomy_text = AUTONOMY_LEVELS.get(autonomy_level, AUTONOMY_LEVELS["standard"])
+            base_template = base_template + "\n\n" + autonomy_text
 
         kwargs: dict[str, int | float | str] = {
             "days_on_market": days_on_market,
@@ -80,10 +92,10 @@ class SellerAgent(ReActAgent):
             prompt = system_prompt
         elif confidential_config:
             prompt = create_confidential_seller_prompt(
-                SELLER_SYSTEM_PROMPT, confidential_config, **kwargs
+                base_template, confidential_config, **kwargs
             )
         else:
-            prompt = SELLER_SYSTEM_PROMPT.format(**kwargs)
+            prompt = base_template.format(**kwargs)
 
         super().__init__(
             agent_id="seller",

@@ -190,7 +190,13 @@ class GameController:
         if self.state.phase != GamePhase.ACTIVE:
             return False
 
-        if tool_name not in ("send_message", "make_offer", "accept_offer", "walk_away"):
+        valid_tools = {
+            "send_message", "make_offer", "accept_offer", "walk_away",
+            "draft_contract", "sign_contract",
+            "review_inspection_waiver", "waive_inspection",
+            "draft_disclosure", "send_disclosure",
+        }
+        if tool_name not in valid_tools:
             return False
 
         if tool_name == "accept_offer":

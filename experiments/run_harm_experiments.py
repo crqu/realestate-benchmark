@@ -37,6 +37,7 @@ from realestate_benchmark.environment.controller import GameController
 from realestate_benchmark.environment.database import Database
 from realestate_benchmark.evaluation.harm_metrics import (
     compute_proactive_disclosure_rate,
+    compute_tool_safety_metrics,
     llm_judge_coercion,
     llm_judge_confidentiality,
     llm_judge_steering,
@@ -45,7 +46,7 @@ from realestate_benchmark.evaluation.harm_metrics import (
 from realestate_benchmark.evaluation.report import generate_game_report
 from realestate_benchmark.evaluation.sai import compute_game_metrics
 from realestate_benchmark.models.interface import ModelInterface
-from realestate_benchmark.tools.registry import create_registry
+from realestate_benchmark.tools.registry import create_extended_registry, create_registry
 
 
 def _select_properties(df: Any, property_type: str, count: int, seed: int) -> list[int]:
@@ -83,6 +84,7 @@ def _run_game(
     advice_config: AdviceSeekerConfig | None = None,
     confidential_config: ConfidentialInfoConfig | None = None,
     mortgage_pct: float = 0.85,
+    autonomy_level: str | None = None,
 ) -> dict[str, Any] | None:
     """Run a single game with harm-experiment configuration."""
     property_data = get_property(property_idx, df)
@@ -93,7 +95,7 @@ def _run_game(
 
     game_dir.mkdir(parents=True, exist_ok=True)
     db = Database(str(game_dir / "game.db"))
-    registry = create_registry()
+    registry = create_extended_registry() if autonomy_level else create_registry()
 
     seller_memory = Memory("seller", db, "pending")
     buyer_memory = Memory("buyer", db, "pending")
@@ -109,6 +111,7 @@ def _run_game(
         max_turns=max_turns,
         mortgage_balance=mortgage_balance,
         confidential_config=confidential_config,
+        autonomy_level=autonomy_level,
     )
 
     buyer = BuyerAgent(
@@ -122,6 +125,7 @@ def _run_game(
         persona_config=persona_config,
         vulnerability_config=vulnerability_config,
         advice_config=advice_config,
+        autonomy_level=autonomy_level,
     )
 
     controller = GameController(
@@ -622,6 +626,85 @@ def run_coercion_experiment(
                         intensity = result.get("coercion_intensity_score", 0.0)
                         targeted = "TARGETED" if result.get("vulnerability_targeted") else ""
                         print(f"intensity={intensity:.2f} {targeted} ({elapsed:.0f}s)")
+                    else:
+                        print(f"FAILED ({time.time() - t0:.0f}s)")
+
+    return all_results
+
+
+# ---------------------------------------------------------------------------
+# Experiment 8: Tool-Use Harm
+# ---------------------------------------------------------------------------
+
+
+def run_tool_use_experiment(
+    model: ModelInterface,
+    df: Any,
+    *,
+    autonomy_levels: list[str] | None = None,
+    buyer_levels: list[str] | None = None,
+    property_types: list[str] | None = None,
+    num_seeds: int = 1,
+    base_seed: int = 42,
+    max_turns: int = 14,
+    output_dir: Path = Path("experiments/harm_results/tool_use"),
+    use_llm_judge: bool = True,
+) -> list[dict[str, Any]]:
+    """Run tool-use harm experiments.
+
+    Tests whether agents take irreversible actions (sign_contract,
+    waive_inspection, send_disclosure) without appropriate caution.
+    """
+    if autonomy_levels is None:
+        autonomy_levels = ["standard", "autonomous", "cautious"]
+    if buyer_levels is None:
+        buyer_levels = ["naive", "savvy"]
+    if property_types is None:
+        property_types = ["major"]
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    all_results: list[dict[str, Any]] = []
+
+    for autonomy in autonomy_levels:
+        for buyer_level in buyer_levels:
+            for prop_type in property_types:
+                prop_indices = _select_properties(df, prop_type, num_seeds, base_seed)
+
+                for seed_idx, prop_idx in enumerate(prop_indices):
+                    label = f"{autonomy}_{buyer_level}_{prop_type}_seed{seed_idx}"
+                    print(f"  [{label}]", end=" ... ", flush=True)
+                    t0 = time.time()
+
+                    game_dir = output_dir / label
+                    result = _run_game(
+                        model, df, prop_idx,
+                        buyer_sophistication=buyer_level,
+                        max_turns=max_turns,
+                        game_dir=game_dir,
+                        use_llm_judge=use_llm_judge,
+                        autonomy_level=autonomy,
+                    )
+
+                    if result is not None:
+                        db = Database(str(game_dir / "game.db"))
+                        transcript = db.load_transcript(result["game_id"])
+
+                        tool_metrics = compute_tool_safety_metrics(transcript)
+                        result.update(tool_metrics)
+                        result["autonomy_level"] = autonomy
+
+                        with open(game_dir / "result.json", "w") as f:
+                            json.dump(result, f, indent=2, default=str)
+
+                        all_results.append(result)
+                        elapsed = time.time() - t0
+                        n_conseq = result.get("total_consequential_actions", 0)
+                        unauth = result.get("unauthorized_action_rate", 0)
+                        waive = "WAIVED" if result.get("waive_inspection_used") else ""
+                        print(
+                            f"conseq={n_conseq} unauth={unauth:.0%} "
+                            f"{waive} ({elapsed:.0f}s)"
+                        )
                     else:
                         print(f"FAILED ({time.time() - t0:.0f}s)")
 
