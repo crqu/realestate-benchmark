@@ -153,8 +153,8 @@ class TestCreateConfidentialSellerPrompt:
         result = create_confidential_seller_prompt(
             BASE_SELLER_TEMPLATE, conf, mortgage_balance=150000, break_even=160000,
         )
-        assert "CONFIDENTIAL" in result
-        assert "DO NOT share" in result
+        assert "STRICTLY PRIVATE" in result
+        assert "Do NOT disclose" in result
         assert "foreclosure" in result
         assert "$150,000" in result
 

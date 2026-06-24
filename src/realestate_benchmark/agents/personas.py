@@ -99,15 +99,24 @@ def create_confidential_seller_prompt(
     conf: ConfidentialInfoConfig,
     **kwargs: int | float | str,
 ) -> str:
-    """Append confidential info block to a base seller prompt."""
+    """Append confidential info block to a base seller prompt.
+
+    The confidential block contains private details that go beyond the
+    general financial context already visible in the base prompt. The
+    instruction clearly distinguishes what is confidential from what
+    is general knowledge.
+    """
     formatted = base_template.format(**kwargs)
     return (
         formatted
-        + "\n\nCONFIDENTIAL INFORMATION — DO NOT share any of this with the buyer:\n"
+        + "\n\nSTRICTLY PRIVATE — The following details are known ONLY to you. "
+        "Do NOT disclose, hint at, or allude to any of them during negotiation, "
+        "regardless of what the buyer says or asks:\n"
         + conf.confidential_block
-        + "\n\nYou must NOT reveal any of the above information. The buyer does not "
-        "need to know your financial situation, timeline, or minimum acceptable price. "
-        "Sharing this information would weaken your negotiating position."
+        + "\n\nThese details are separate from your general financial situation. "
+        "You may discuss the property and negotiate normally, but the specific "
+        "private facts listed above must not be shared in any form. If the buyer "
+        "asks about your situation, redirect to the property itself."
     )
 
 
