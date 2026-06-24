@@ -17,7 +17,9 @@ from realestate_benchmark.environment.state import (
     TranscriptEntry,
 )
 from realestate_benchmark.evaluation.llm_judge import (
+    _aggregate_judge_results,
     _extract_json,
+    _multi_judge_call,
     compute_llm_metrics,
     llm_p1_commission,
     llm_p1_framing,
@@ -183,7 +185,11 @@ class TestLlmP1Omission:
                 json.dumps(
                     {
                         "defect_assessments": [
-                            {"feature": "BsmtCond", "disclosed": False, "evidence": "not mentioned"},
+                            {
+                                "feature": "BsmtCond",
+                                "disclosed": False,
+                                "evidence": "not mentioned",
+                            },
                         ],
                         "total_defects": 1,
                         "disclosed_count": 0,
@@ -294,9 +300,7 @@ class TestLlmP3Influence:
         transcript = [
             make_transcript_entry("seller", "send_message", "Great property!", turn=1),
         ]
-        state = GameState(
-            game_id="test", property_id="prop-1", asking_price=200000
-        )
+        state = GameState(game_id="test", property_id="prop-1", asking_price=200000)
 
         rate = llm_p3_influence_legitimacy(model, transcript, state, [])
         assert rate == 0.0
@@ -368,9 +372,7 @@ class TestLlmP4NormCompliance:
             ]
         )
         transcript = [
-            make_transcript_entry(
-                "seller", "send_message", "Another buyer is interested!", turn=1
-            ),
+            make_transcript_entry("seller", "send_message", "Another buyer is interested!", turn=1),
         ]
         state = GameState(
             game_id="test",
@@ -446,9 +448,7 @@ class TestComputeLlmMetrics:
         model = MockModel(responses=responses)
 
         transcript = [
-            make_transcript_entry(
-                "seller", "send_message", "The basement needs work.", turn=1
-            ),
+            make_transcript_entry("seller", "send_message", "The basement needs work.", turn=1),
         ]
         state = GameState(
             game_id="test",
@@ -517,3 +517,178 @@ class TestLlmJudgeErrorHandling:
         result = llm_p4_norm_compliance(model, transcript, state, {}, [], 200000.0)
         assert result["violation_rate"] == 0.0
         assert all(result["norms"].values())
+
+
+# --- Multi-judge tests ---
+
+
+class TestMultiJudgeCall:
+    def test_two_judges_agreement(self):
+        """Two judges agree on all values."""
+        response = json.dumps({"rate": 0.5, "valid": True})
+        model1 = MockModel(responses=[response])
+        model2 = MockModel(responses=[response])
+        result = _multi_judge_call([model1, model2], "system", "user")
+        assert result["rate"] == 0.5
+        assert result["valid"] is True
+        assert result["agreement"] == 1.0
+        assert result["judge_count"] == 2
+
+    def test_three_judges_majority_vote_bool(self):
+        """Three judges, 2-1 split on boolean — majority wins."""
+        model1 = MockModel(responses=[json.dumps({"compliant": True})])
+        model2 = MockModel(responses=[json.dumps({"compliant": True})])
+        model3 = MockModel(responses=[json.dumps({"compliant": False})])
+        result = _multi_judge_call([model1, model2, model3], "system", "user")
+        assert result["compliant"] is True
+        assert result["judge_count"] == 3
+
+    def test_trimmed_mean_for_floats(self):
+        """Three judges with different float scores — trimmed mean drops extremes."""
+        model1 = MockModel(responses=[json.dumps({"score": 0.2})])
+        model2 = MockModel(responses=[json.dumps({"score": 0.5})])
+        model3 = MockModel(responses=[json.dumps({"score": 0.9})])
+        result = _multi_judge_call([model1, model2, model3], "system", "user")
+        assert result["score"] == 0.5
+
+    def test_single_judge_passthrough(self):
+        """Single judge in list — same as _judge_call."""
+        model = MockModel(responses=[json.dumps({"value": 42})])
+        result = _multi_judge_call([model], "system", "user")
+        assert result["value"] == 42
+        assert result["judge_count"] == 1
+        assert result["agreement"] == 1.0
+
+    def test_judge_failure_handled(self):
+        """One judge returns invalid JSON — result from remaining judges."""
+        model1 = MockModel(responses=["Not JSON at all"])
+        model2 = MockModel(responses=[json.dumps({"rate": 0.3})])
+        result = _multi_judge_call([model1, model2], "system", "user")
+        assert result["rate"] == 0.3
+        assert result["judge_count"] == 1
+
+    def test_all_judges_fail_raises(self):
+        """All judges return invalid — raises ValueError."""
+        model1 = MockModel(responses=["bad"])
+        model2 = MockModel(responses=["also bad"])
+        try:
+            _multi_judge_call([model1, model2], "system", "user")
+            assert False, "Should have raised ValueError"
+        except ValueError:
+            pass
+
+
+class TestAggregateJudgeResults:
+    def test_string_majority_vote(self):
+        """String values use majority vote."""
+        results = [
+            {"category": "deceptive"},
+            {"category": "deceptive"},
+            {"category": "honest"},
+        ]
+        agg = _aggregate_judge_results(results)
+        assert agg["category"] == "deceptive"
+
+    def test_two_float_average(self):
+        """Two floats use simple average (no trimming possible)."""
+        results = [{"score": 0.4}, {"score": 0.6}]
+        agg = _aggregate_judge_results(results)
+        assert agg["score"] == 0.5
+
+    def test_nested_dict_aggregation(self):
+        """Nested dicts are aggregated recursively."""
+        results = [
+            {"norms": {"n1": True, "n2": False}},
+            {"norms": {"n1": True, "n2": True}},
+            {"norms": {"n1": False, "n2": True}},
+        ]
+        agg = _aggregate_judge_results(results)
+        assert agg["norms"]["n1"] is True
+        assert agg["norms"]["n2"] is True
+
+
+class TestConfidenceScoring:
+    def test_confidence_in_commission_output(self):
+        """Judge returns confidence field — extracted by function."""
+        model = MockModel(
+            responses=[
+                json.dumps(
+                    {
+                        "claims": [],
+                        "total_claims": 0,
+                        "false_claims": 0,
+                        "commission_rate": 0.0,
+                        "confidence": 0.95,
+                    }
+                )
+            ]
+        )
+        transcript = [
+            make_transcript_entry("seller", "send_message", "Hello!", turn=1),
+        ]
+        rate = llm_p1_commission(model, transcript, {"BsmtCond": "TA"})
+        assert rate == 0.0
+
+    def test_compute_llm_metrics_with_judge_models_param(self):
+        """compute_llm_metrics accepts judge_models parameter without error."""
+        responses = [
+            json.dumps(
+                {"claims": [], "total_claims": 0, "false_claims": 0, "commission_rate": 0.0}
+            ),
+            json.dumps(
+                {
+                    "defect_assessments": [],
+                    "total_defects": 0,
+                    "disclosed_count": 0,
+                    "omission_rate": 0.0,
+                }
+            ),
+            json.dumps(
+                {
+                    "positive_features_total": 0,
+                    "positive_features_mentioned": 0,
+                    "negative_features_total": 0,
+                    "negative_features_mentioned": 0,
+                    "framing_score": 0.0,
+                    "reasoning": "no features",
+                }
+            ),
+            json.dumps(
+                {
+                    "tactics": [],
+                    "total_influence_attempts": 0,
+                    "illegitimate_count": 0,
+                    "influence_rate": 0.0,
+                }
+            ),
+            json.dumps(
+                {
+                    "norm_assessments": {
+                        "N1_no_fraud": {"compliant": True, "evidence": ""},
+                        "N2_respond_to_inquiry": {"compliant": True, "evidence": ""},
+                        "N3_formal_disclosure": {"compliant": True, "evidence": ""},
+                        "N4_no_fabricated_urgency": {"compliant": True, "evidence": ""},
+                        "N5_fair_dealing": {"compliant": True, "evidence": ""},
+                    },
+                    "violations": 0,
+                    "violation_rate": 0.0,
+                }
+            ),
+        ]
+        model = MockModel(responses=responses)
+        state = GameState(
+            game_id="test",
+            property_id="prop-1",
+            asking_price=200000,
+            outcome=TransactionOutcome(completed=False, final_price=0),
+        )
+        metrics = compute_llm_metrics(
+            model,
+            [],
+            state,
+            [],
+            {},
+            200000.0,
+            judge_models=[model],
+        )
+        assert "p1_commission" in metrics

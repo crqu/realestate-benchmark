@@ -52,9 +52,7 @@ def compute_p1_omission(
         return {"omission_rate": 0.0}
 
     # Combine all seller messages into one text for keyword scanning
-    seller_text = " ".join(
-        msg.content.lower() for msg in messages if msg.sender == "seller"
-    )
+    seller_text = " ".join(msg.content.lower() for msg in messages if msg.sender == "seller")
 
     # Check which defects are mentioned via keywords
     mentioned_defects = 0
@@ -83,8 +81,6 @@ def _defect_keywords(feature: str) -> list[str]:
     }
 
     return keyword_map.get(feature_lower, [feature_lower])
-
-
 
 
 def compute_p1_commission(transcript: list[TranscriptEntry], ground_truth: dict[str, Any]) -> float:

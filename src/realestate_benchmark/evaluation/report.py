@@ -162,6 +162,67 @@ def generate_game_report(
         lines.append(f"  - **{norm_id}**: {status}")
     lines.append("")
 
+    # Negotiation Dynamics
+    if "negotiation_dynamics" in metrics:
+        dynamics = metrics["negotiation_dynamics"]
+        lines.append("## Negotiation Dynamics")
+        lines.append("")
+        trajectory = dynamics.get("offer_trajectory", [])
+        lines.append(f"- **Total offers**: {len(trajectory)}")
+        rounds = dynamics.get("efficiency_offer_rounds", 0)
+        lines.append(f"- **Offer-counteroffer rounds**: {rounds}")
+        msgs_before = dynamics.get("efficiency_messages_before_first_offer", 0)
+        lines.append(f"- **Messages before first offer**: {msgs_before}")
+        if dynamics.get("zopa_position") is not None:
+            lines.append(
+                f"- **ZOPA position**: {dynamics['zopa_position']:.2f} "
+                f"(0=true value, 1=asking price)"
+            )
+        conv_rate = dynamics.get("convergence_rate", 0)
+        if conv_rate > 0:
+            lines.append(f"- **Convergence rate**: ${conv_rate:,.0f}/turn")
+        if dynamics.get("concession_reciprocity") is not None:
+            lines.append(f"- **Concession reciprocity**: {dynamics['concession_reciprocity']:.2f}")
+        if dynamics.get("anchor_ratio") is not None:
+            lines.append(
+                f"- **Anchor ratio**: {dynamics['anchor_ratio']:.3f} (final price / first offer)"
+            )
+        lines.append("")
+
+    # Reasoning Analysis
+    if "reasoning_analysis" in metrics:
+        reasoning = metrics["reasoning_analysis"]
+        lines.append("## Reasoning Analysis")
+        lines.append("")
+
+        lines.append("### Strategic Intent")
+        lines.append("")
+        dist = reasoning.get("intent_distribution", {})
+        for category in [
+            "no_strategic_reasoning",
+            "honest_intent",
+            "deceptive_intent",
+            "rationalized_deception",
+        ]:
+            count = dist.get(category, 0)
+            lines.append(f"- **{category}**: {count} turns")
+        lines.append(f"- **Deception rate**: {reasoning.get('deception_rate', 0.0):.1%}")
+        lines.append("")
+
+        lines.append("### Plan-Action Divergence")
+        lines.append("")
+        div_dist = reasoning.get("divergence_distribution", {})
+        for dtype in [
+            "aligned",
+            "honest_divergence",
+            "deceptive_divergence",
+            "tactical_divergence",
+        ]:
+            count = div_dist.get(dtype, 0)
+            lines.append(f"- **{dtype}**: {count} turns")
+        lines.append(f"- **Alignment rate**: {reasoning.get('alignment_rate', 0.0):.1%}")
+        lines.append("")
+
     # Key Observations
     lines.append("## Key Observations")
     lines.append("")
