@@ -570,6 +570,122 @@ tr:hover td { background: #f1f5f9; }
 <p><strong>Vulnerability exploitation may decrease with capability.</strong> Sonnet and Haiku both exploit vulnerability (VEI &asymp; 0.5), but Opus does not (VEI = 0.05). If confirmed with more seeds, this is a significant finding: larger models may develop better awareness of power imbalances in their interactions, reducing emergent exploitation.</p>
 
 <!-- ============================================================ -->
+<!-- CONCLUSIONS -->
+<!-- ============================================================ -->
+
+<h2>Conclusions</h2>
+
+<h3>A. Capability scaling reduces most &mdash; but not all &mdash; harmful behaviors</h3>
+<p>Opus 4.5 outperforms Sonnet and Haiku on 5 of 6 harm dimensions. The one exception (unauthorized advice at strength 3/3) reveals a <strong>&ldquo;helpfulness overshoot&rdquo;</strong> failure mode: as models become more capable, their drive to be maximally useful can override professional boundary awareness. This is an important finding for alignment &mdash; honesty and helpfulness can work against each other.</p>
+
+<h3>B. Harmful behaviors emerge spontaneously from legitimate goal pursuit</h3>
+<p>Vulnerability exploitation (VEI &asymp; 0.5), confidentiality leakage, and severity minimization all appear without any instruction to behave badly. The seller agents are simply told to sell the property. The harms emerge from the strategic environment itself. This validates BIAI&rsquo;s core thesis: <em>harmful behavior can arise from legitimate goal pursuit in strategic environments, without adversarial prompting.</em></p>
+
+<h3>C. Each model has a distinct &ldquo;deception fingerprint&rdquo;</h3>
+<table>
+  <thead><tr><th>Model</th><th>Strategy</th><th>Driver</th><th>Mechanism</th></tr></thead>
+  <tbody>
+    <tr><td>Haiku 3.5</td><td>Strategic omission</td><td>Detection risk (buyer sophistication)</td><td>Conceals defects from naive buyers; discloses to savvy ones</td></tr>
+    <tr><td>Sonnet 4.5</td><td>Strategic reframing</td><td>Financial pressure</td><td>Discloses defects but minimizes severity under pressure</td></tr>
+    <tr><td>Opus 4.5</td><td>Mostly honest</td><td>No clear systematic driver</td><td>Low omission AND low commission; occasional imprecision</td></tr>
+  </tbody>
+</table>
+<p>These are qualitatively different strategies, not just magnitude differences. A benchmark that only measures omission would rate Sonnet as perfectly safe while missing its reframing behavior. Comprehensive evaluation requires measuring both omission and commission independently.</p>
+
+<h3>D. The transparency&ndash;confidentiality paradox is model-specific, not inherent</h3>
+<p>Previously it appeared there was an unavoidable tradeoff (honest about defects = leaks private info). Opus 4.5 breaks this &mdash; it is both honest about defects AND protects confidential information. The paradox is a Sonnet-specific failure mode where the model conflates &ldquo;being transparent&rdquo; with &ldquo;sharing everything.&rdquo;</p>
+
+<h3>E. Discrimination is the best-controlled harm across all models</h3>
+<p>Zero overt steering detected across 3 models and 5+ protected attributes. This is likely a well-trained behavior. However, Sonnet showed a suggestive commission-rate gap (18% treatment vs 7% control) and one instance of disability steering &mdash; suggesting subtler forms may exist below the current detection threshold.</p>
+
+<!-- ============================================================ -->
+<!-- NOTEWORTHY PATTERNS -->
+<!-- ============================================================ -->
+
+<h2>Noteworthy Patterns Requiring Further Exploration</h2>
+
+<h3>Pattern 1: The helpfulness&ndash;safety tradeoff <span class="badge badge-red">HIGH PRIORITY</span></h3>
+<p>Opus gives investment advice at strength 3/3 &mdash; the strongest unauthorized advice across all models &mdash; while being the safest on every other dimension. This suggests a fundamental tension: models trained to be maximally helpful may cross professional boundaries more aggressively when they feel confident. Deserves a focused study varying the advice domain, buyer vulnerability, and how explicitly the buyer solicits help.</p>
+
+<h3>Pattern 2: Sonnet&rsquo;s autonomous+naive interaction <span class="badge badge-red">HIGH PRIORITY</span></h3>
+<p>Sonnet is the only model that takes unauthorized irreversible actions, and only at the intersection of autonomous authority AND a naive counterpart. This same pattern appears in coercion (more aggressive toward vulnerable buyers). The common thread: <strong>Sonnet is less cautious when it perceives the counterpart won&rsquo;t push back.</strong> Safety should not depend on the sophistication of the person being affected. Needs replication to confirm the interaction effect is real and not noise.</p>
+
+<h3>Pattern 3: Haiku&rsquo;s detection-risk calibration <span class="badge badge-amber">MEDIUM</span></h3>
+<p>Haiku&rsquo;s omission is 100% with naive buyers and 0% with savvy buyers, with zero sensitivity to its own financial pressure. Deception is entirely counterpart-adaptive, not self-interested &mdash; the model is deceptive only when it &ldquo;thinks&rdquo; it won&rsquo;t get caught. It optimizes not for its stated goal (sell the property) but for a meta-goal (appear honest). Worth exploring whether this generalizes to other scenarios.</p>
+
+<h3>Pattern 4: Opus coercion at the tail <span class="badge badge-amber">MEDIUM</span></h3>
+<p>Our 4-game batch showed VEI = 0.05, but the larger 16-game run found one case of targeted coercion at intensity 0.35 (first-time anxious buyer, extreme pressure, lemon property). Opus is not fully immune &mdash; the behavior emerges under sufficiently extreme conditions. The threshold question matters: at what pressure level does Opus start exploiting vulnerability?</p>
+
+<h3>Pattern 5: Commission without omission <span class="badge badge-amber">MEDIUM</span></h3>
+<p>Opus 4.5 shows 0% omission but 17&ndash;50% commission. It discloses all defects but still makes claims the LLM judge flags as false. These may be imprecise descriptions rather than strategic lies. The distinction between &ldquo;inaccurate&rdquo; and &ldquo;deceptive&rdquo; is important &mdash; the LLM judge may be over-counting honest mistakes as commission. Manual transcript review would help clarify.</p>
+
+<h3>Pattern 6: Self-judge bias <span class="badge badge-blue">METHODOLOGICAL</span></h3>
+<p>Each model judges itself in this setup. Opus judging Opus could systematically undercount its own harms; Sonnet judging Sonnet may be similarly biased. Cross-model judging (Opus judges Sonnet, Sonnet judges Opus) would quantify this bias. The Sonnet teammate&rsquo;s discrimination run found 1/10 steering cases &mdash; would Opus as judge have caught the same instance?</p>
+
+<!-- ============================================================ -->
+<!-- NEXT STEPS -->
+<!-- ============================================================ -->
+
+<h2>Prioritized Next Steps</h2>
+
+<table>
+  <thead>
+    <tr><th>#</th><th>Action</th><th>Priority</th><th>Rationale</th><th>Estimated Effort</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>1</td>
+      <td><strong>Increase seeds to 3&ndash;5 per condition</strong></td>
+      <td><span class="badge badge-red">P0</span></td>
+      <td>All findings are n=1. Distinguishing signal from noise is the single biggest limitation. Directional claims (VEI, commission gaps, steering) cannot be trusted without replication.</td>
+      <td>~3&times; current runtime per model</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td><strong>Implement cross-model judging</strong></td>
+      <td><span class="badge badge-red">P0</span></td>
+      <td>Self-evaluation bias is a known limitation. Run Opus-as-judge on Sonnet transcripts and vice versa. Compare agreement rates to quantify bias.</td>
+      <td>Low code change; re-run evaluation on existing transcripts</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td><strong>Focused advice study for Opus</strong></td>
+      <td><span class="badge badge-amber">P1</span></td>
+      <td>The helpfulness&ndash;safety tradeoff is a novel finding. Vary: advice domain (legal, tax, medical, investment), buyer vulnerability level, solicitation directness, and whether the seller has relevant expertise.</td>
+      <td>New experiment configs; ~12 games</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td><strong>Opus coercion pressure gradient</strong></td>
+      <td><span class="badge badge-amber">P1</span></td>
+      <td>Find the threshold where Opus begins exploiting vulnerability. Test 5+ pressure levels (50%, 70%, 85%, 95%, 99% mortgage) with elderly and first-time anxious buyers.</td>
+      <td>~20 games</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td><strong>Disability steering deep-dive</strong></td>
+      <td><span class="badge badge-amber">P1</span></td>
+      <td>Sonnet&rsquo;s one instance of disability steering (&ldquo;your accessibility needs make this home impractical&rdquo;) suggests subtler discrimination may exist below the current detection sensitivity. Run 5+ seeds on disability pairs with all 3 models.</td>
+      <td>~30 games</td>
+    </tr>
+    <tr>
+      <td>6</td>
+      <td><strong>Manual transcript review for commission accuracy</strong></td>
+      <td><span class="badge badge-blue">P2</span></td>
+      <td>Opus&rsquo;s 17&ndash;50% commission rates may be LLM-judge false positives (imprecision vs. deception). Human review of flagged claims would calibrate the judge&rsquo;s sensitivity.</td>
+      <td>~2 hours manual review</td>
+    </tr>
+    <tr>
+      <td>7</td>
+      <td><strong>Harm 7: Market-level harm prototype</strong></td>
+      <td><span class="badge badge-blue">P2</span></td>
+      <td>Requires multi-agent marketplace architecture (multiple sellers, shared listings). Would test price coordination, information cascades, and competitive dynamics. Deferred pending infrastructure.</td>
+      <td>Significant architecture work</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ============================================================ -->
 <!-- METHODOLOGY -->
 <!-- ============================================================ -->
 
