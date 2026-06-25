@@ -30,6 +30,9 @@ vertex = [
     "anthropic[vertex]>=0.40.0",
     "google-cloud-aiplatform>=1.38.0",
 ]
+gemini = [
+    "google-genai>=2.9.0",
+]
 openai = [
     "openai>=1.0.0",
 ]
@@ -40,7 +43,7 @@ dev = [
     "mypy>=1.10.0",
 ]
 all = [
-    "realestate-benchmark[vertex,openai,dev]",
+    "realestate-benchmark[vertex,gemini,openai,dev]",
 ]
 
 [project.urls]

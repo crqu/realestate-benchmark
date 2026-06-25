@@ -43,6 +43,24 @@ from realestate_benchmark.models.vertex import VertexModel
 from realestate_benchmark.tools.registry import create_registry
 
 
+def create_judge_model(provider: str, model_name: str, project_id: str, region: str,
+                       json_mode: bool = False):
+    """Create a model instance for the LLM judge."""
+    if provider == "gemini":
+        from realestate_benchmark.models.gemini import GeminiModel
+        return GeminiModel(
+            project_id=project_id, region=region, model=model_name,
+            json_mode=json_mode,
+        )
+    elif provider == "vertex":
+        return VertexModel(project_id=project_id, region=region, model=model_name)
+    elif provider == "anthropic":
+        from realestate_benchmark.models.anthropic import AnthropicModel
+        return AnthropicModel(model=model_name)
+    else:
+        raise ValueError(f"Unknown provider: {provider}")
+
+
 def print_section(title: str):
     print(f"\n{'=' * 70}")
     print(f"  {title}")
@@ -112,6 +130,23 @@ def main():
         "--use-llm-judge",
         action="store_true",
         help="Use LLM-as-judge for P1/P3/P4 evaluation instead of regex matching",
+    )
+    parser.add_argument(
+        "--judge-model",
+        default=None,
+        help="Model for LLM judge (default: same as --model). "
+             "For Gemini, use e.g. 'gemini-2.5-pro'.",
+    )
+    parser.add_argument(
+        "--judge-provider",
+        choices=["vertex", "gemini", "anthropic"],
+        default=None,
+        help="Provider for judge model (default: inferred from model name)",
+    )
+    parser.add_argument(
+        "--judge-json-mode",
+        action="store_true",
+        help="Enable JSON output mode for Gemini judge (recommended)",
     )
 
     args = parser.parse_args()
@@ -198,6 +233,19 @@ def main():
     except Exception as e:
         print(f"Error initializing model: {e}")
         return 1
+
+    # Judge model (may differ from game agent model)
+    if args.judge_model:
+        judge_provider = args.judge_provider or (
+            "gemini" if "gemini" in args.judge_model else "vertex"
+        )
+        judge_model = create_judge_model(
+            judge_provider, args.judge_model, args.project_id, args.region,
+            json_mode=args.judge_json_mode,
+        )
+        print(f"Judge model: {args.judge_model} via {judge_provider}")
+    else:
+        judge_model = model
 
     # Step 4: Initialize database
     print_section("Step 4: Initializing Database")
@@ -296,7 +344,7 @@ def main():
 
     if args.use_llm_judge:
         metrics = compute_llm_metrics(
-            model, transcript, state, defects, property_data, true_value,
+            judge_model, transcript, state, defects, property_data, true_value,
             max_turns=args.max_turns,
         )
         print(f"  P1 Commission: {metrics['p1_commission']:.2%}")
@@ -340,6 +388,8 @@ def main():
         print(f"  P4 Violation Rate: {metrics['p4_norms']['violation_rate']:.2%}")
 
     metrics["evaluation_mode"] = eval_mode
+    metrics["agent_model"] = args.model
+    metrics["judge_model"] = judge_model.model_name if args.use_llm_judge else None
     with open(experiment_dir / "metrics.json", "w") as f:
         json.dump(metrics, f, indent=2, default=str)
 
@@ -353,7 +403,7 @@ def main():
         defects=defects,
         ground_truth=property_data,
         true_value=true_value,
-        judge_model=model if args.use_llm_judge else None,
+        judge_model=judge_model if args.use_llm_judge else None,
     )
 
     report_path = experiment_dir / "report.md"
