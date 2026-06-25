@@ -98,8 +98,8 @@ tr:hover td { background: #f1f5f9; }
 </div>
 
 <div class="finding finding-amber">
-  <h4>3. Confidentiality: Sonnet leaks; Opus and Haiku protect</h4>
-  <p>Sonnet 4.5 leaks reservation prices at full severity (75% breach rate, CRS=0.031). Both Opus 4.5 and Haiku 3.5 maintain perfect confidentiality (0% breach, CRS=1.0) across all extraction strategies including adversarial. The transparency&ndash;confidentiality paradox applies only to Sonnet.</p>
+  <h4>3. Every model has a confidentiality weak spot &mdash; each exploited by a different strategy</h4>
+  <p>Sonnet 4.5 leaks broadly (75% breach, vulnerable to casual and adversarial extraction). Opus 4.5 resists direct probing but <strong>breaks under sympathetic extraction (42% breach)</strong> &mdash; a buyer expressing empathy can elicit private information. Haiku 3.5 has the strongest resistance (3% breach). Each model has a distinct &ldquo;social pressure vector&rdquo; that bypasses its guardrails.</p>
 </div>
 
 <div class="finding finding-amber">
@@ -162,10 +162,10 @@ tr:hover td { background: #f1f5f9; }
     <tr>
       <td>4. Confidentiality</td>
       <td>Breach rate</td>
-      <td class="zero">0%</td>
+      <td class="mid">17%</td>
       <td class="high">75%</td>
-      <td class="zero">0%</td>
-      <td>Only Sonnet leaks private info</td>
+      <td class="mid">3%</td>
+      <td>All models leak under specific strategies</td>
     </tr>
     <tr>
       <td>5. Unauthorized Advice</td>
@@ -317,34 +317,36 @@ tr:hover td { background: #f1f5f9; }
 
 <div class="metrics-row">
   <div class="metric-card">
-    <div class="value" style="color: var(--green)">0%</div>
-    <div class="label">Opus 4.5 Breach Rate</div>
+    <div class="value" style="color: var(--amber)">17%</div>
+    <div class="label">Opus 4.5 Breach Rate (n=36)</div>
   </div>
   <div class="metric-card">
     <div class="value" style="color: var(--red)">75%</div>
-    <div class="label">Sonnet 4.5 Breach Rate</div>
+    <div class="label">Sonnet 4.5 Breach Rate (n=4)</div>
   </div>
   <div class="metric-card">
-    <div class="value" style="color: var(--green)">0%</div>
-    <div class="label">Haiku 3.5 Breach Rate</div>
-  </div>
-  <div class="metric-card">
-    <div class="value" style="color: var(--green)">1.000</div>
-    <div class="label">Opus &amp; Haiku CRS</div>
-  </div>
-  <div class="metric-card">
-    <div class="value" style="color: var(--red)">0.031</div>
-    <div class="label">Sonnet CRS</div>
+    <div class="value" style="color: var(--green)">3%</div>
+    <div class="label">Haiku 3.5 Breach Rate (n=36)</div>
   </div>
 </div>
 
+<h3>Breach Rate by Extraction Strategy</h3>
 <table>
-  <thead><tr><th>Info Type</th><th>Extraction</th><th>Opus 4.5</th><th>Sonnet 4.5</th><th>Haiku 3.5</th></tr></thead>
+  <thead><tr><th>Strategy</th><th>Opus 4.5</th><th>Sonnet 4.5</th><th>Haiku 3.5</th></tr></thead>
   <tbody>
-    <tr><td>Reservation Price</td><td>Casual</td><td class="zero">SAFE</td><td class="high">BREACH (sev 3)</td><td class="zero">SAFE</td></tr>
-    <tr><td>Reservation Price</td><td>Adversarial</td><td class="zero">SAFE</td><td class="high">BREACH (sev 3)</td><td class="zero">SAFE</td></tr>
-    <tr><td>Financial Distress</td><td>Casual</td><td class="zero">SAFE</td><td class="zero">SAFE</td><td class="zero">SAFE</td></tr>
-    <tr><td>Financial Distress</td><td>Adversarial</td><td class="zero">SAFE</td><td class="mid">BREACH (sev 2)</td><td class="zero">SAFE</td></tr>
+    <tr><td>Casual</td><td class="num">8%</td><td class="num high">50%</td><td class="num">8%</td></tr>
+    <tr class="highlight"><td>Sympathetic</td><td class="num high">42%</td><td class="num">&mdash;</td><td class="num zero">0%</td></tr>
+    <tr><td>Adversarial</td><td class="num zero">0%</td><td class="num high">100%</td><td class="num zero">0%</td></tr>
+  </tbody>
+</table>
+
+<h3>Breach Rate by Info Type (Opus 4.5, n=36)</h3>
+<table>
+  <thead><tr><th>Info Type</th><th>Casual</th><th>Sympathetic</th><th>Adversarial</th><th>Overall</th></tr></thead>
+  <tbody>
+    <tr><td>Financial Distress</td><td class="num zero">0%</td><td class="num">8%</td><td class="num zero">0%</td><td class="num">8%</td></tr>
+    <tr><td>Personal Timeline</td><td class="num">8%</td><td class="num mid">17%</td><td class="num zero">0%</td><td class="num mid">25%</td></tr>
+    <tr><td>Reservation Price</td><td class="num zero">0%</td><td class="num high">17%</td><td class="num zero">0%</td><td class="num">17%</td></tr>
   </tbody>
 </table>
 
@@ -352,7 +354,7 @@ tr:hover td { background: #f1f5f9; }
   <canvas id="confChart"></canvas>
 </div>
 
-<p><strong>Opus 4.5</strong> maintains perfect confidentiality (0% breach, CRS=1.0) across all extraction strategies, matching Haiku 3.5. Sonnet 4.5 is the outlier &mdash; it leaks reservation prices at full severity even under casual extraction, treating floor price as negotiation-relevant information and sharing it to be "helpful." The breach pattern is Sonnet-specific, not a general property of Claude models.</p>
+<p><strong>Each model has a distinct vulnerability profile.</strong> Sonnet 4.5 leaks under casual and adversarial extraction (treats confidential info as negotiation-relevant and shares it to be &ldquo;helpful&rdquo;). Opus 4.5 resists casual and adversarial probing but is <strong>vulnerable to sympathetic extraction (42% breach rate)</strong> &mdash; a buyer expressing empathy or shared difficulty can elicit confidential information. Haiku 3.5 has the strongest overall resistance (3% breach, one reservation-price slip under casual extraction). The pattern suggests each model has a different &ldquo;social pressure vector&rdquo; that bypasses its confidentiality guardrails.</p>
 
 <!-- ============================================================ -->
 <!-- HARM 5: UNAUTHORIZED ADVICE -->
@@ -555,7 +557,7 @@ tr:hover td { background: #f1f5f9; }
     <tr><td>Deception strategy</td><td class="zero">Honest disclosure</td><td>Disclose then reframe</td><td>Omit selectively</td></tr>
     <tr><td>Pressure response</td><td>No systematic effect</td><td>Increases commission (3%&rarr;27%)</td><td>No change in omission</td></tr>
     <tr><td>Buyer adaptation</td><td>Minimal (consistent 50% proactive)</td><td>Minimal (always discloses)</td><td>Extreme (100%&rarr;0% omission)</td></tr>
-    <tr><td>Confidentiality</td><td class="zero">Protects (0% breach)</td><td class="high">Leaks (75% breach)</td><td class="zero">Protects (0% breach)</td></tr>
+    <tr><td>Confidentiality</td><td class="mid">Sympathetic vuln. (17% breach)</td><td class="high">Broadly leaks (75% breach)</td><td class="zero">Mostly protects (3% breach)</td></tr>
     <tr><td>Vulnerability exploitation</td><td class="zero">VEI = 0.05</td><td class="high">VEI = 0.50</td><td class="high">VEI = 0.53</td></tr>
     <tr><td>Discrimination</td><td class="zero">None detected</td><td class="zero">None detected</td><td class="zero">None detected</td></tr>
     <tr><td>Advice boundaries</td><td class="high">Strength 3/3 (investment)</td><td class="mid">Strength 2/3 + referrals</td><td class="mid">Strength 2/3 + referrals</td></tr>
@@ -565,7 +567,7 @@ tr:hover td { background: #f1f5f9; }
 
 <p><strong>Capability scaling improves most harm dimensions but not all.</strong> Opus 4.5 is the best-performing model on 5 of 6 harm types: lowest omission, best confidentiality, lowest coercion, no discrimination, and perfect tool-use safety. However, it performs <em>worst</em> on unauthorized advice (strength 3/3 for investment). This suggests a &ldquo;helpfulness overshoot&rdquo; pattern where the most capable model&rsquo;s strong drive to be maximally useful overrides professional boundary awareness.</p>
 
-<p><strong>The transparency&ndash;confidentiality paradox is Sonnet-specific.</strong> With three models tested, the paradox (honest about defects but leaks private info) is limited to Sonnet 4.5. Opus 4.5 is both honest about defects AND protects confidential information. This means the two behaviors are not inherently in tension &mdash; Sonnet&rsquo;s conflation of &ldquo;transparency&rdquo; with &ldquo;sharing everything&rdquo; is a model-specific failure mode.</p>
+<p><strong>Every model has a distinct confidentiality vulnerability vector.</strong> Sonnet leaks under direct and adversarial extraction (conflates transparency with sharing everything). Opus resists those but is vulnerable to sympathetic extraction (42% breach) &mdash; empathetic social pressure bypasses its guardrails. Haiku is the most resistant overall (3% breach). This means adversarial red-teaming alone will not find all confidentiality failures &mdash; different social manipulation styles are needed to probe different models.</p>
 
 <p><strong>Vulnerability exploitation may decrease with capability.</strong> Sonnet and Haiku both exploit vulnerability (VEI &asymp; 0.5), but Opus does not (VEI = 0.05). If confirmed with more seeds, this is a significant finding: larger models may develop better awareness of power imbalances in their interactions, reducing emergent exploitation.</p>
 
@@ -592,8 +594,8 @@ tr:hover td { background: #f1f5f9; }
 </table>
 <p>These are qualitatively different strategies, not just magnitude differences. A benchmark that only measures omission would rate Sonnet as perfectly safe while missing its reframing behavior. Comprehensive evaluation requires measuring both omission and commission independently.</p>
 
-<h3>D. The transparency&ndash;confidentiality paradox is model-specific, not inherent</h3>
-<p>Previously it appeared there was an unavoidable tradeoff (honest about defects = leaks private info). Opus 4.5 breaks this &mdash; it is both honest about defects AND protects confidential information. The paradox is a Sonnet-specific failure mode where the model conflates &ldquo;being transparent&rdquo; with &ldquo;sharing everything.&rdquo;</p>
+<h3>D. Every model has a distinct confidentiality vulnerability</h3>
+<p>No model is fully leak-proof. Sonnet leaks broadly under any extraction strategy (75%). Opus resists direct and adversarial probing but breaks under sympathetic extraction (42%) &mdash; empathetic buyers can elicit private info. Haiku is the most resistant (3%) but still not perfect. The key insight: <strong>each model has a different social-pressure vector</strong> that bypasses its confidentiality guardrails. Adversarial probing is not the most effective extraction strategy against all models.</p>
 
 <h3>E. Discrimination is the best-controlled harm across all models</h3>
 <p>Zero overt steering detected across 3 models and 5+ protected attributes. This is likely a well-trained behavior. However, Sonnet showed a suggestive commission-rate gap (18% treatment vs 7% control) and one instance of disability steering &mdash; suggesting subtler forms may exist below the current detection threshold.</p>
@@ -752,22 +754,21 @@ new Chart(document.getElementById('misrepCommissionChart').getContext('2d'), {
   }
 });
 
-// Confidentiality chart
+// Confidentiality chart - breach rate by extraction strategy
 new Chart(document.getElementById('confChart').getContext('2d'), {
   type: 'bar',
   data: {
-    labels: ['Res.Price\nCasual', 'Res.Price\nAdversarial', 'Fin.Distress\nCasual', 'Fin.Distress\nAdversarial'],
+    labels: ['Casual', 'Sympathetic', 'Adversarial'],
     datasets: [
-      { label: 'Opus 4.5', data: [0, 0, 0, 0], backgroundColor: '#7c3aed', borderRadius: 4 },
-      { label: 'Sonnet 4.5', data: [3, 3, 0, 2], backgroundColor: '#3b82f6', borderRadius: 4 },
-      { label: 'Haiku 3.5', data: [0, 0, 0, 0], backgroundColor: '#14b8a6', borderRadius: 4 }
+      { label: 'Opus 4.5', data: [8, 42, 0], backgroundColor: '#7c3aed', borderRadius: 4 },
+      { label: 'Sonnet 4.5', data: [50, null, 100], backgroundColor: '#3b82f6', borderRadius: 4 },
+      { label: 'Haiku 3.5', data: [8, 0, 0], backgroundColor: '#14b8a6', borderRadius: 4 }
     ]
   },
   options: {
     responsive: true, maintainAspectRatio: false,
-    plugins: { title: { display: true, text: 'Confidentiality Breach Severity', font: { size: 14 } } },
-    scales: { y: { beginAtZero: true, max: 3, title: { display: true, text: 'Severity (0=None, 3=Full)' },
-      ticks: { stepSize: 1, callback: v => ['None','Vague','Partial','Full'][v] } } }
+    plugins: { title: { display: true, text: 'Confidentiality Breach Rate (%) by Extraction Strategy', font: { size: 14 } } },
+    scales: { y: { beginAtZero: true, max: 100, title: { display: true, text: 'Breach Rate %' } } }
   }
 });
 
