@@ -213,20 +213,30 @@ def compute_reasoning_profile(
             "avg_confidence": 0.0,
         }
 
+    from concurrent.futures import ThreadPoolExecutor
+
     turn_analyses = []
     intent_counts: dict[str, int] = {k: 0 for k in VALID_INTENT_CATEGORIES}
     divergence_counts: dict[str, int] = {k: 0 for k in VALID_DIVERGENCE_CATEGORIES}
     confidences: list[float] = []
 
-    for entry in qualifying:
-        analysis = llm_analyze_reasoning(
-            model,
-            entry.reasoning_trace,
-            defects,
-            entry.turn,
-            entry.tool_name,
-            entry.parameters,
-        )
+    # Run all per-turn reasoning analyses in parallel
+    with ThreadPoolExecutor(max_workers=min(8, len(qualifying))) as executor:
+        futures = [
+            executor.submit(
+                llm_analyze_reasoning,
+                model,
+                entry.reasoning_trace,
+                defects,
+                entry.turn,
+                entry.tool_name,
+                entry.parameters,
+            )
+            for entry in qualifying
+        ]
+
+    for entry, future in zip(qualifying, futures):
+        analysis = future.result()
         analysis["turn"] = entry.turn
         turn_analyses.append(analysis)
 

@@ -103,67 +103,79 @@ class GeminiModel:
         tools: list[ToolDefinition] | None = None,
         temperature: float = 0.7,
     ) -> ModelResponse:
-        try:
-            system_instruction, contents = self._convert_messages(messages)
+        import time as _time
 
-            config = types.GenerateContentConfig(
-                temperature=temperature,
-                max_output_tokens=16384,
+        system_instruction, contents = self._convert_messages(messages)
+
+        config = types.GenerateContentConfig(
+            temperature=temperature,
+            max_output_tokens=16384,
+        )
+
+        if system_instruction:
+            config.system_instruction = system_instruction
+
+        if self._json_mode and not tools:
+            config.response_mime_type = "application/json"
+
+        if self._thinking_budget is not None:
+            config.thinking_config = types.ThinkingConfig(
+                thinking_budget=self._thinking_budget
             )
 
-            if system_instruction:
-                config.system_instruction = system_instruction
+        if tools:
+            config.tools = [self._convert_tools(tools)]
 
-            if self._json_mode and not tools:
-                config.response_mime_type = "application/json"
-
-            if self._thinking_budget is not None:
-                config.thinking_config = types.ThinkingConfig(
-                    thinking_budget=self._thinking_budget
+        last_error = None
+        for attempt in range(4):
+            try:
+                response = self.client.models.generate_content(
+                    model=self._model,
+                    contents=contents,
+                    config=config,
                 )
+                break
+            except Exception as e:
+                last_error = e
+                if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+                    wait = 2 ** attempt + 1
+                    logger.warning("Rate limited (attempt %d), retrying in %ds", attempt + 1, wait)
+                    _time.sleep(wait)
+                    continue
+                raise RuntimeError(f"Gemini API error: {e}") from e
+        else:
+            raise RuntimeError(f"Gemini API error after 4 retries: {last_error}") from last_error
 
-            if tools:
-                config.tools = [self._convert_tools(tools)]
+        content = response.text or ""
 
-            response = self.client.models.generate_content(
-                model=self._model,
-                contents=contents,
-                config=config,
-            )
-
-            content = response.text or ""
-
-            tool_calls = []
-            if response.candidates and response.candidates[0].content:
-                for part in response.candidates[0].content.parts:
-                    if part.function_call:
-                        tool_calls.append(
-                            ToolCall(
-                                name=part.function_call.name,
-                                arguments=dict(part.function_call.args)
-                                if part.function_call.args
-                                else {},
-                            )
+        tool_calls = []
+        if response.candidates and response.candidates[0].content:
+            for part in response.candidates[0].content.parts:
+                if part.function_call:
+                    tool_calls.append(
+                        ToolCall(
+                            name=part.function_call.name,
+                            arguments=dict(part.function_call.args)
+                            if part.function_call.args
+                            else {},
                         )
-
-            usage = {"input_tokens": 0, "output_tokens": 0}
-            if response.usage_metadata:
-                usage["input_tokens"] = response.usage_metadata.prompt_token_count or 0
-                usage["output_tokens"] = (
-                    response.usage_metadata.candidates_token_count or 0
-                )
-                if response.usage_metadata.thoughts_token_count:
-                    logger.debug(
-                        "Thinking tokens: %d",
-                        response.usage_metadata.thoughts_token_count,
                     )
 
-            return ModelResponse(
-                content=content,
-                tool_calls=tool_calls,
-                usage=usage,
-                model_name=self._model,
+        usage = {"input_tokens": 0, "output_tokens": 0}
+        if response.usage_metadata:
+            usage["input_tokens"] = response.usage_metadata.prompt_token_count or 0
+            usage["output_tokens"] = (
+                response.usage_metadata.candidates_token_count or 0
             )
+            if response.usage_metadata.thoughts_token_count:
+                logger.debug(
+                    "Thinking tokens: %d",
+                    response.usage_metadata.thoughts_token_count,
+                )
 
-        except Exception as e:
-            raise RuntimeError(f"Gemini API error: {e}") from e
+        return ModelResponse(
+            content=content,
+            tool_calls=tool_calls,
+            usage=usage,
+            model_name=self._model,
+        )

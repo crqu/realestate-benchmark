@@ -1,0 +1,1034 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BIAI V5 — Comprehensive Experiment Report</title>
+<style>
+:root {
+    --bg: #fafafa;
+    --card: #ffffff;
+    --border: #e0e0e0;
+    --text: #1a1a2e;
+    --muted: #6b7280;
+    --accent: #2563eb;
+    --accent-light: #dbeafe;
+    --green: #c6efce;
+    --yellow: #fff2cc;
+    --orange: #fce4d6;
+    --red: #ffc7ce;
+    --header-bg: #1e293b;
+    --header-text: #f1f5f9;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 0;
+}
+.header {
+    background: var(--header-bg);
+    color: var(--header-text);
+    padding: 2.5rem 2rem;
+    text-align: center;
+}
+.header h1 { font-size: 2rem; font-weight: 700; margin-bottom: 0.25rem; letter-spacing: -0.02em; }
+.header .subtitle { color: #94a3b8; font-size: 1rem; }
+.header .meta { color: #64748b; font-size: 0.85rem; margin-top: 0.5rem; }
+.container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+.section { margin-bottom: 2.5rem; }
+.section h2 {
+    font-size: 1.4rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--accent);
+    color: var(--text);
+}
+.section h3 { font-size: 1.1rem; font-weight: 600; margin: 1.2rem 0 0.6rem; color: var(--text); }
+.card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1.2rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+.stat-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.2rem;
+    text-align: center;
+}
+.stat-card .stat-value { font-size: 2rem; font-weight: 700; color: var(--accent); }
+.stat-card .stat-label { font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    margin-bottom: 1rem;
+}
+th {
+    background: #f1f5f9;
+    padding: 0.6rem 0.8rem;
+    text-align: left;
+    font-weight: 600;
+    border-bottom: 2px solid var(--border);
+    white-space: nowrap;
+}
+td {
+    padding: 0.5rem 0.8rem;
+    border-bottom: 1px solid #f0f0f0;
+}
+tr:hover td { background: #f8fafc; }
+.highlight-row td { font-weight: 600; }
+.sig { color: #dc2626; font-weight: 700; }
+.best { font-weight: 700; }
+.metric-name { font-weight: 500; min-width: 180px; }
+
+.profile-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+    gap: 1.2rem;
+}
+.profile-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.5rem;
+}
+.profile-card h4 {
+    font-size: 1.1rem;
+    margin-bottom: 0.6rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.profile-card .tag {
+    display: inline-block;
+    font-size: 0.7rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+.tag-orange { background: #fce4d6; color: #9a3412; }
+.tag-red { background: #ffc7ce; color: #991b1b; }
+.tag-green { background: #c6efce; color: #166534; }
+.tag-blue { background: #dbeafe; color: #1e40af; }
+.profile-card ul { margin: 0.5rem 0 0 1.2rem; }
+.profile-card li { margin-bottom: 0.3rem; font-size: 0.9rem; }
+
+.checklist { list-style: none; padding: 0; }
+.checklist li { padding: 0.4rem 0; font-size: 0.95rem; }
+.checklist li::before { margin-right: 0.5rem; }
+.check-yes::before { content: "\2705"; }
+.check-partial::before { content: "\26A0\FE0F"; }
+.check-no::before { content: "\274C"; }
+
+.finding-box {
+    border-left: 4px solid var(--accent);
+    padding: 0.8rem 1rem;
+    margin: 0.8rem 0;
+    background: #f8fafc;
+    border-radius: 0 4px 4px 0;
+}
+.finding-box.critical { border-left-color: #dc2626; background: #fef2f2; }
+.finding-box.warning { border-left-color: #f59e0b; background: #fffbeb; }
+.finding-box.success { border-left-color: #16a34a; background: #f0fdf4; }
+
+.nav {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: #ffffff;
+    border-bottom: 1px solid var(--border);
+    padding: 0.6rem 2rem;
+    display: flex;
+    gap: 1.2rem;
+    flex-wrap: wrap;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.nav a {
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 0.3rem 0;
+}
+.nav a:hover { text-decoration: underline; }
+
+footer {
+    text-align: center;
+    padding: 2rem;
+    color: var(--muted);
+    font-size: 0.8rem;
+    border-top: 1px solid var(--border);
+    margin-top: 2rem;
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+    <h1>BIAI V5 — Behavioral Integrity in Agent Interactions</h1>
+    <div class="subtitle">Comprehensive Experiment Report — CoLM 2026 Workshop Supplementary Material</div>
+    <div class="meta">Generated 2026-06-26 &middot; 2,010 games &middot; 3 models &middot; 6 experiments &middot; Gemini 2.5 Pro judge</div>
+</div>
+
+<nav class="nav">
+    <a href="#executive-summary">Executive Summary</a>
+    <a href="#cross-model">Cross-Model Comparison</a>
+    <a href="#per-experiment">Per-Experiment Breakdown</a>
+    <a href="#psi-analysis">PSI Analysis</a>
+    <a href="#profiles">Model Profiles</a>
+    <a href="#quality">Quality Validation</a>
+</nav>
+
+<div class="container">
+
+
+<section class="section" id="executive-summary">
+<h2>1. Executive Summary</h2>
+<div class="stat-grid">
+
+<div class="stat-card"><div class="stat-value">2,010</div><div class="stat-label">Total Games</div></div>
+<div class="stat-card"><div class="stat-value">3</div><div class="stat-label">Models Tested</div></div>
+<div class="stat-card"><div class="stat-value">6</div><div class="stat-label">Experiment Types</div></div>
+<div class="stat-card"><div class="stat-value">50%</div><div class="stat-label">Completion Rate</div></div>
+</div>
+<div class="card">
+<h3>Key Findings</h3>
+
+<div class="finding-box success">
+<strong>Sonnet 4.5</strong> achieves the highest disclosure completeness (DCI = 0.970) with near-zero omission,
+setting the integrity benchmark. However, it employs the most manipulative influence tactics (P3 = 0.852).
+</div>
+<div class="finding-box critical">
+<strong>Opus 4.5</strong> is most susceptible to pressure: P3 PSI = +0.537***,
+p = 0.0000. Under high financial pressure, Opus significantly escalates illegitimate influence tactics.
+</div>
+<div class="finding-box warning">
+<strong>Haiku 3.5</strong> has the highest commission rate (0.335, ~3x Sonnet) and most norm violations
+(P4 = 0.244), but uses almost no influence tactics — its harms are factual, not strategic.
+</div>
+<div class="finding-box">
+<strong>Cross-cutting</strong>: No model achieves clean integrity across all dimensions. Each exhibits a distinct "harm profile" —
+deception types vary by architecture, not just magnitude. This validates BIAI's multi-dimensional evaluation framework.
+</div>
+
+</div></section>
+
+<section class="section" id="cross-model">
+<h2>2. Cross-Model Comparison</h2>
+<div class="card">
+<p style="font-size:0.85rem;color:var(--muted);margin-bottom:1rem;">
+All values: mean ± SD [95% CI]. Color: <span style="background:#c6efce;padding:0.1rem 0.4rem;border-radius:3px;">good</span>
+<span style="background:#e2efda;padding:0.1rem 0.4rem;border-radius:3px;">acceptable</span>
+<span style="background:#fff2cc;padding:0.1rem 0.4rem;border-radius:3px;">moderate</span>
+<span style="background:#fce4d6;padding:0.1rem 0.4rem;border-radius:3px;">concerning</span>
+<span style="background:#ffc7ce;padding:0.1rem 0.4rem;border-radius:3px;">poor</span>.
+Significance: * p&lt;0.05, ** p&lt;0.01, *** p&lt;0.001 (Mann-Whitney U).
+</p>
+<div style="overflow-x:auto;">
+<table>
+<thead>
+<tr><th>Metric</th>
+<th>Sonnet 4.5 (n=670)</th>
+<th>Opus 4.5 (n=670)</th>
+<th>Haiku 3.5 (n=670)</th>
+<th>S vs O</th><th>S vs H</th><th>O vs H</th></tr></thead><tbody>
+<tr><td class="metric-name">P1 Commission Rate</td>
+<td style="background:#e2efda;" class=" best">0.108 ± 0.150 [0.097, 0.119]</td>
+<td style="background:#e2efda;" class="">0.145 ± 0.163 [0.133, 0.158]</td>
+<td style="background:#fce4d6;" class="">0.335 ± 0.237 [0.317, 0.353]</td>
+<td class="sig">0.0000***</td>
+<td class="sig">0.0000***</td>
+<td class="sig">0.0000***</td>
+</tr>
+<tr><td class="metric-name">P1 Omission Rate</td>
+<td style="background:#c6efce;" class=" best">0.010 ± 0.102 [0.003, 0.018]</td>
+<td style="background:#c6efce;" class="">0.038 ± 0.179 [0.024, 0.051]</td>
+<td style="background:#e2efda;" class="">0.066 ± 0.206 [0.051, 0.082]</td>
+<td class="sig">0.0000***</td>
+<td class="sig">0.0000***</td>
+<td class="sig">0.0000***</td>
+</tr>
+<tr><td class="metric-name">P1 DCI</td>
+<td style="background:#c6efce;" class=" best">0.970 ± 0.148 [0.959, 0.981]</td>
+<td style="background:#e2efda;" class="">0.890 ± 0.251 [0.871, 0.909]</td>
+<td style="background:#e2efda;" class="">0.774 ± 0.300 [0.751, 0.797]</td>
+<td class="sig">0.0000***</td>
+<td class="sig">0.0000***</td>
+<td class="sig">0.0000***</td>
+</tr>
+<tr><td class="metric-name">P1 SWOR</td>
+<td style="background:#c6efce;" class=" best">0.013 ± 0.110 [0.004, 0.021]</td>
+<td style="background:#c6efce;" class="">0.047 ± 0.198 [0.032, 0.062]</td>
+<td style="background:#e2efda;" class="">0.087 ± 0.245 [0.069, 0.106]</td>
+<td class="sig">0.0000***</td>
+<td class="sig">0.0000***</td>
+<td class="sig">0.0000***</td>
+</tr>
+<tr><td class="metric-name">P1 SOI</td>
+<td style="background:#c6efce;" class=" best">-0.001 ± 0.038 [-0.004, 0.001]</td>
+<td style="background:#c6efce;" class="">0.015 ± 0.152 [0.003, 0.026]</td>
+<td style="background:#e2efda;" class="">0.063 ± 0.268 [0.043, 0.084]</td>
+<td class="sig">0.0074**</td>
+<td class="sig">0.0000***</td>
+<td class="sig">0.0000***</td>
+</tr>
+<tr><td class="metric-name">P1 Framing Bias</td>
+<td style="background:#fff2cc;" class=" best">0.193 ± 0.242 [0.174, 0.211]</td>
+<td style="background:#fce4d6;" class="">0.387 ± 0.261 [0.368, 0.407]</td>
+<td style="background:#fce4d6;" class="">0.320 ± 0.319 [0.295, 0.344]</td>
+<td class="sig">0.0000***</td>
+<td class="sig">0.0000***</td>
+<td class="sig">0.0000***</td>
+</tr>
+<tr><td class="metric-name">P3 Influence Legitimacy</td>
+<td style="background:#ffc7ce;" class="">0.852 ± 0.305 [0.829, 0.876]</td>
+<td style="background:#ffc7ce;" class="">0.668 ± 0.446 [0.634, 0.702]</td>
+<td style="background:#e2efda;" class=" best">0.114 ± 0.303 [0.091, 0.137]</td>
+<td class="sig">0.0000***</td>
+<td class="sig">0.0000***</td>
+<td class="sig">0.0000***</td>
+</tr>
+<tr><td class="metric-name">P3a Fabricated Offers</td>
+<td style="background:#fff2cc;" class="">0.300 ± 0.732 [0.245, 0.355]</td>
+<td style="background:#e2efda;" class="">0.057 ± 0.256 [0.037, 0.076]</td>
+<td style="background:#c6efce;" class=" best">0.001 ± 0.039 [-0.001, 0.004]</td>
+<td class="sig">0.0000***</td>
+<td class="sig">0.0000***</td>
+<td class="sig">0.0000***</td>
+</tr>
+<tr><td class="metric-name">P3b False Urgency</td>
+<td style="background:#fce4d6;" class="">0.754 ± 1.055 [0.674, 0.834]</td>
+<td style="background:#fce4d6;" class="">0.513 ± 0.845 [0.449, 0.577]</td>
+<td style="background:#e2efda;" class=" best">0.170 ± 0.592 [0.125, 0.215]</td>
+<td class="sig">0.0001***</td>
+<td class="sig">0.0000***</td>
+<td class="sig">0.0000***</td>
+</tr>
+<tr><td class="metric-name">P3c Emotional Exploitation</td>
+<td style="background:#ffc7ce;" class="">3.087 ± 2.004 [2.935, 3.238]</td>
+<td style="background:#ffc7ce;" class="">1.751 ± 1.907 [1.606, 1.895]</td>
+<td style="background:#c6efce;" class=" best">0.045 ± 0.253 [0.026, 0.064]</td>
+<td class="sig">0.0000***</td>
+<td class="sig">0.0000***</td>
+<td class="sig">0.0000***</td>
+</tr>
+<tr><td class="metric-name">P4 Violation Rate</td>
+<td style="background:#e2efda;" class=" best">0.130 ± 0.122 [0.120, 0.139]</td>
+<td style="background:#fff2cc;" class="">0.151 ± 0.119 [0.142, 0.160]</td>
+<td style="background:#fff2cc;" class="">0.244 ± 0.151 [0.232, 0.255]</td>
+<td class="sig">0.0003***</td>
+<td class="sig">0.0000***</td>
+<td class="sig">0.0000***</td>
+</tr>
+</tbody></table></div></div></section>
+
+<section class="section" id="per-experiment">
+<h2>3. Per-Experiment Breakdown</h2>
+
+<div class="card"><h3>Misrepresentation (n = 180 per model)</h3>
+<div style="overflow-x:auto;"><table><thead><tr><th>Metric</th>
+<th>Sonnet 4.5</th>
+<th>Opus 4.5</th>
+<th>Haiku 3.5</th>
+</tr></thead><tbody>
+<tr><td class="metric-name">P1 Commission Rate</td>
+<td style="background:#e2efda;">0.117 ± 0.156 [0.094, 0.139]</td>
+<td style="background:#e2efda;">0.127 ± 0.150 [0.105, 0.149]</td>
+<td style="background:#fff2cc;">0.276 ± 0.247 [0.240, 0.312]</td>
+</tr>
+<tr><td class="metric-name">P1 Omission Rate</td>
+<td style="background:#c6efce;">0.000 ± 0.000 [0.000, 0.000]</td>
+<td style="background:#c6efce;">0.005 ± 0.042 [-0.001, 0.012]</td>
+<td style="background:#c6efce;">0.009 ± 0.089 [-0.004, 0.022]</td>
+</tr>
+<tr><td class="metric-name">P1 DCI</td>
+<td style="background:#c6efce;">0.977 ± 0.128 [0.958, 0.996]</td>
+<td style="background:#c6efce;">0.956 ± 0.137 [0.936, 0.976]</td>
+<td style="background:#e2efda;">0.893 ± 0.204 [0.863, 0.922]</td>
+</tr>
+<tr><td class="metric-name">P1 SWOR</td>
+<td style="background:#c6efce;">0.003 ± 0.035 [-0.002, 0.008]</td>
+<td style="background:#c6efce;">0.013 ± 0.087 [0.000, 0.026]</td>
+<td style="background:#c6efce;">0.010 ± 0.097 [-0.004, 0.024]</td>
+</tr>
+<tr><td class="metric-name">P1 SOI</td>
+<td style="background:#c6efce;">-0.005 ± 0.073 [-0.016, 0.005]</td>
+<td style="background:#c6efce;">0.011 ± 0.147 [-0.010, 0.033]</td>
+<td style="background:#c6efce;">0.005 ± 0.065 [-0.005, 0.014]</td>
+</tr>
+<tr><td class="metric-name">P1 Framing Bias</td>
+<td style="background:#fff2cc;">0.233 ± 0.258 [0.195, 0.270]</td>
+<td style="background:#fce4d6;">0.403 ± 0.252 [0.366, 0.439]</td>
+<td style="background:#fff2cc;">0.212 ± 0.260 [0.174, 0.250]</td>
+</tr>
+<tr><td class="metric-name">P3 Influence Legitimacy</td>
+<td style="background:#ffc7ce;">0.823 ± 0.311 [0.778, 0.869]</td>
+<td style="background:#ffc7ce;">0.691 ± 0.432 [0.628, 0.754]</td>
+<td style="background:#e2efda;">0.128 ± 0.322 [0.081, 0.175]</td>
+</tr>
+<tr><td class="metric-name">P3a Fabricated Offers</td>
+<td style="background:#fff2cc;">0.261 ± 0.720 [0.156, 0.366]</td>
+<td style="background:#e2efda;">0.072 ± 0.300 [0.028, 0.116]</td>
+<td style="background:#c6efce;">0.000 ± 0.000 [0.000, 0.000]</td>
+</tr>
+<tr><td class="metric-name">P3b False Urgency</td>
+<td style="background:#fce4d6;">0.728 ± 1.093 [0.568, 0.887]</td>
+<td style="background:#fce4d6;">0.567 ± 0.916 [0.433, 0.700]</td>
+<td style="background:#fff2cc;">0.217 ± 0.749 [0.107, 0.326]</td>
+</tr>
+<tr><td class="metric-name">P3c Emotional Exploitation</td>
+<td style="background:#ffc7ce;">2.817 ± 2.035 [2.519, 3.114]</td>
+<td style="background:#ffc7ce;">1.683 ± 1.732 [1.430, 1.936]</td>
+<td style="background:#e2efda;">0.050 ± 0.243 [0.015, 0.085]</td>
+</tr>
+<tr><td class="metric-name">P4 Violation Rate</td>
+<td style="background:#e2efda;">0.143 ± 0.131 [0.124, 0.162]</td>
+<td style="background:#e2efda;">0.138 ± 0.118 [0.121, 0.155]</td>
+<td style="background:#fff2cc;">0.204 ± 0.120 [0.187, 0.222]</td>
+</tr>
+</tbody></table></div></div>
+<div class="card"><h3>Discrimination (n = 100 per model)</h3>
+<div style="overflow-x:auto;"><table><thead><tr><th>Metric</th>
+<th>Sonnet 4.5</th>
+<th>Opus 4.5</th>
+<th>Haiku 3.5</th>
+</tr></thead><tbody>
+<tr><td class="metric-name">P1 Commission Rate</td>
+<td style="background:#e2efda;">0.105 ± 0.101 [0.086, 0.125]</td>
+<td style="background:#fff2cc;">0.162 ± 0.172 [0.128, 0.195]</td>
+<td style="background:#fce4d6;">0.351 ± 0.232 [0.305, 0.397]</td>
+</tr>
+<tr><td class="metric-name">P1 Omission Rate</td>
+<td style="background:#c6efce;">0.000 ± 0.000 [0.000, 0.000]</td>
+<td style="background:#c6efce;">0.020 ± 0.114 [-0.002, 0.042]</td>
+<td style="background:#c6efce;">0.003 ± 0.033 [-0.003, 0.010]</td>
+</tr>
+<tr><td class="metric-name">P1 DCI</td>
+<td style="background:#c6efce;">0.985 ± 0.111 [0.963, 1.007]</td>
+<td style="background:#c6efce;">0.903 ± 0.232 [0.858, 0.949]</td>
+<td style="background:#e2efda;">0.832 ± 0.220 [0.788, 0.875]</td>
+</tr>
+<tr><td class="metric-name">P1 SWOR</td>
+<td style="background:#c6efce;">0.000 ± 0.000 [0.000, 0.000]</td>
+<td style="background:#c6efce;">0.038 ± 0.156 [0.007, 0.068]</td>
+<td style="background:#c6efce;">0.006 ± 0.063 [-0.006, 0.019]</td>
+</tr>
+<tr><td class="metric-name">P1 SOI</td>
+<td style="background:#c6efce;">0.000 ± 0.000 [0.000, 0.000]</td>
+<td style="background:#c6efce;">0.010 ± 0.221 [-0.033, 0.053]</td>
+<td style="background:#c6efce;">0.010 ± 0.099 [-0.010, 0.029]</td>
+</tr>
+<tr><td class="metric-name">P1 Framing Bias</td>
+<td style="background:#e2efda;">0.131 ± 0.198 [0.092, 0.170]</td>
+<td style="background:#fce4d6;">0.334 ± 0.256 [0.284, 0.384]</td>
+<td style="background:#fff2cc;">0.213 ± 0.261 [0.162, 0.264]</td>
+</tr>
+<tr><td class="metric-name">P3 Influence Legitimacy</td>
+<td style="background:#ffc7ce;">0.895 ± 0.276 [0.841, 0.949]</td>
+<td style="background:#ffc7ce;">0.867 ± 0.317 [0.805, 0.929]</td>
+<td style="background:#e2efda;">0.137 ± 0.332 [0.072, 0.202]</td>
+</tr>
+<tr><td class="metric-name">P3a Fabricated Offers</td>
+<td style="background:#fff2cc;">0.250 ± 0.672 [0.118, 0.382]</td>
+<td style="background:#c6efce;">0.030 ± 0.171 [-0.004, 0.064]</td>
+<td style="background:#c6efce;">0.000 ± 0.000 [0.000, 0.000]</td>
+</tr>
+<tr><td class="metric-name">P3b False Urgency</td>
+<td style="background:#fce4d6;">0.650 ± 0.914 [0.471, 0.829]</td>
+<td style="background:#fce4d6;">0.570 ± 0.820 [0.409, 0.731]</td>
+<td style="background:#fff2cc;">0.260 ± 0.733 [0.116, 0.404]</td>
+</tr>
+<tr><td class="metric-name">P3c Emotional Exploitation</td>
+<td style="background:#ffc7ce;">3.540 ± 1.660 [3.215, 3.865]</td>
+<td style="background:#ffc7ce;">2.410 ± 1.848 [2.048, 2.772]</td>
+<td style="background:#c6efce;">0.030 ± 0.223 [-0.014, 0.074]</td>
+</tr>
+<tr><td class="metric-name">P4 Violation Rate</td>
+<td style="background:#e2efda;">0.132 ± 0.099 [0.113, 0.151]</td>
+<td style="background:#fff2cc;">0.154 ± 0.117 [0.131, 0.177]</td>
+<td style="background:#fff2cc;">0.196 ± 0.090 [0.178, 0.214]</td>
+</tr>
+<tr class="highlight-row"><td class="metric-name">Steering Detected</td>
+<td>0.050 ± 0.219 [0.007, 0.093]</td>
+<td>0.040 ± 0.197 [0.001, 0.079]</td>
+<td>0.010 ± 0.100 [-0.010, 0.030]</td>
+</tr>
+<tr class="highlight-row"><td class="metric-name">Differential Treatment Detected</td>
+<td>0.080 ± 0.273 [0.027, 0.133]</td>
+<td>0.030 ± 0.171 [-0.004, 0.064]</td>
+<td>0.040 ± 0.197 [0.001, 0.079]</td>
+</tr>
+</tbody></table></div></div>
+<div class="card"><h3>Confidentiality (n = 180 per model)</h3>
+<div style="overflow-x:auto;"><table><thead><tr><th>Metric</th>
+<th>Sonnet 4.5</th>
+<th>Opus 4.5</th>
+<th>Haiku 3.5</th>
+</tr></thead><tbody>
+<tr><td class="metric-name">P1 Commission Rate</td>
+<td style="background:#e2efda;">0.116 ± 0.173 [0.090, 0.141]</td>
+<td style="background:#fff2cc;">0.157 ± 0.169 [0.133, 0.182]</td>
+<td style="background:#fce4d6;">0.392 ± 0.217 [0.360, 0.423]</td>
+</tr>
+<tr><td class="metric-name">P1 Omission Rate</td>
+<td style="background:#c6efce;">0.017 ± 0.128 [-0.002, 0.035]</td>
+<td style="background:#c6efce;">0.005 ± 0.042 [-0.001, 0.012]</td>
+<td style="background:#fff2cc;">0.153 ± 0.257 [0.116, 0.191]</td>
+</tr>
+<tr><td class="metric-name">P1 DCI</td>
+<td style="background:#c6efce;">0.956 ± 0.167 [0.931, 0.980]</td>
+<td style="background:#e2efda;">0.878 ± 0.235 [0.843, 0.912]</td>
+<td style="background:#fff2cc;">0.631 ± 0.351 [0.579, 0.682]</td>
+</tr>
+<tr><td class="metric-name">P1 SWOR</td>
+<td style="background:#c6efce;">0.022 ± 0.148 [0.001, 0.044]</td>
+<td style="background:#c6efce;">0.016 ± 0.110 [0.000, 0.032]</td>
+<td style="background:#fff2cc;">0.208 ± 0.316 [0.162, 0.254]</td>
+</tr>
+<tr><td class="metric-name">P1 SOI</td>
+<td style="background:#c6efce;">0.000 ± 0.000 [0.000, 0.000]</td>
+<td style="background:#c6efce;">0.017 ± 0.128 [-0.002, 0.035]</td>
+<td style="background:#fff2cc;">0.204 ± 0.458 [0.137, 0.271]</td>
+</tr>
+<tr><td class="metric-name">P1 Framing Bias</td>
+<td style="background:#fff2cc;">0.197 ± 0.240 [0.162, 0.232]</td>
+<td style="background:#fce4d6;">0.433 ± 0.235 [0.398, 0.467]</td>
+<td style="background:#ffc7ce;">0.599 ± 0.270 [0.560, 0.639]</td>
+</tr>
+<tr><td class="metric-name">P3 Influence Legitimacy</td>
+<td style="background:#ffc7ce;">0.863 ± 0.290 [0.820, 0.905]</td>
+<td style="background:#fce4d6;">0.473 ± 0.480 [0.403, 0.543]</td>
+<td style="background:#e2efda;">0.057 ± 0.227 [0.024, 0.090]</td>
+</tr>
+<tr><td class="metric-name">P3a Fabricated Offers</td>
+<td style="background:#fff2cc;">0.333 ± 0.791 [0.218, 0.449]</td>
+<td style="background:#e2efda;">0.056 ± 0.253 [0.019, 0.092]</td>
+<td style="background:#c6efce;">0.000 ± 0.000 [0.000, 0.000]</td>
+</tr>
+<tr><td class="metric-name">P3b False Urgency</td>
+<td style="background:#fce4d6;">0.806 ± 1.078 [0.648, 0.963]</td>
+<td style="background:#fff2cc;">0.456 ± 0.821 [0.336, 0.575]</td>
+<td style="background:#e2efda;">0.067 ± 0.328 [0.019, 0.115]</td>
+</tr>
+<tr><td class="metric-name">P3c Emotional Exploitation</td>
+<td style="background:#ffc7ce;">2.939 ± 1.794 [2.677, 3.201]</td>
+<td style="background:#fce4d6;">0.589 ± 1.035 [0.438, 0.740]</td>
+<td style="background:#c6efce;">0.011 ± 0.105 [-0.004, 0.026]</td>
+</tr>
+<tr><td class="metric-name">P4 Violation Rate</td>
+<td style="background:#e2efda;">0.124 ± 0.120 [0.107, 0.142]</td>
+<td style="background:#fff2cc;">0.151 ± 0.109 [0.135, 0.167]</td>
+<td style="background:#fce4d6;">0.314 ± 0.176 [0.289, 0.340]</td>
+</tr>
+</tbody></table></div></div>
+<div class="card"><h3>Advice Boundaries (n = 100 per model)</h3>
+<div style="overflow-x:auto;"><table><thead><tr><th>Metric</th>
+<th>Sonnet 4.5</th>
+<th>Opus 4.5</th>
+<th>Haiku 3.5</th>
+</tr></thead><tbody>
+<tr><td class="metric-name">P1 Commission Rate</td>
+<td style="background:#e2efda;">0.080 ± 0.102 [0.060, 0.100]</td>
+<td style="background:#e2efda;">0.124 ± 0.151 [0.094, 0.153]</td>
+<td style="background:#fce4d6;">0.367 ± 0.244 [0.319, 0.415]</td>
+</tr>
+<tr><td class="metric-name">P1 Omission Rate</td>
+<td style="background:#c6efce;">0.000 ± 0.000 [0.000, 0.000]</td>
+<td style="background:#c6efce;">0.000 ± 0.000 [0.000, 0.000]</td>
+<td style="background:#c6efce;">0.007 ± 0.046 [-0.003, 0.016]</td>
+</tr>
+<tr><td class="metric-name">P1 DCI</td>
+<td style="background:#c6efce;">0.997 ± 0.033 [0.990, 1.003]</td>
+<td style="background:#c6efce;">0.980 ± 0.080 [0.964, 0.996]</td>
+<td style="background:#e2efda;">0.827 ± 0.210 [0.785, 0.868]</td>
+</tr>
+<tr><td class="metric-name">P1 SWOR</td>
+<td style="background:#c6efce;">0.000 ± 0.000 [0.000, 0.000]</td>
+<td style="background:#c6efce;">0.000 ± 0.000 [0.000, 0.000]</td>
+<td style="background:#c6efce;">0.012 ± 0.087 [-0.005, 0.029]</td>
+</tr>
+<tr><td class="metric-name">P1 SOI</td>
+<td style="background:#c6efce;">0.000 ± 0.000 [0.000, 0.000]</td>
+<td style="background:#c6efce;">0.000 ± 0.000 [0.000, 0.000]</td>
+<td style="background:#c6efce;">0.020 ± 0.139 [-0.007, 0.047]</td>
+</tr>
+<tr><td class="metric-name">P1 Framing Bias</td>
+<td style="background:#e2efda;">0.138 ± 0.200 [0.099, 0.177]</td>
+<td style="background:#fff2cc;">0.257 ± 0.258 [0.206, 0.308]</td>
+<td style="background:#fff2cc;">0.242 ± 0.286 [0.186, 0.299]</td>
+</tr>
+<tr><td class="metric-name">P3 Influence Legitimacy</td>
+<td style="background:#ffc7ce;">0.919 ± 0.192 [0.881, 0.956]</td>
+<td style="background:#ffc7ce;">0.767 ± 0.380 [0.692, 0.841]</td>
+<td style="background:#e2efda;">0.102 ± 0.297 [0.044, 0.161]</td>
+</tr>
+<tr><td class="metric-name">P3a Fabricated Offers</td>
+<td style="background:#fff2cc;">0.430 ± 0.756 [0.282, 0.578]</td>
+<td style="background:#c6efce;">0.030 ± 0.171 [-0.004, 0.064]</td>
+<td style="background:#c6efce;">0.000 ± 0.000 [0.000, 0.000]</td>
+</tr>
+<tr><td class="metric-name">P3b False Urgency</td>
+<td style="background:#fce4d6;">0.920 ± 1.061 [0.712, 1.128]</td>
+<td style="background:#fff2cc;">0.450 ± 0.796 [0.294, 0.606]</td>
+<td style="background:#e2efda;">0.150 ± 0.520 [0.048, 0.252]</td>
+</tr>
+<tr><td class="metric-name">P3c Emotional Exploitation</td>
+<td style="background:#ffc7ce;">3.440 ± 2.051 [3.038, 3.842]</td>
+<td style="background:#ffc7ce;">2.210 ± 1.771 [1.863, 2.557]</td>
+<td style="background:#c6efce;">0.030 ± 0.223 [-0.014, 0.074]</td>
+</tr>
+<tr><td class="metric-name">P4 Violation Rate</td>
+<td style="background:#e2efda;">0.116 ± 0.121 [0.092, 0.140]</td>
+<td style="background:#e2efda;">0.128 ± 0.112 [0.106, 0.150]</td>
+<td style="background:#fff2cc;">0.206 ± 0.096 [0.187, 0.225]</td>
+</tr>
+<tr class="highlight-row"><td class="metric-name">Advice Given</td>
+<td>0.870 ± 0.338 [0.804, 0.936]</td>
+<td>0.840 ± 0.368 [0.768, 0.912]</td>
+<td>0.830 ± 0.378 [0.756, 0.904]</td>
+</tr>
+<tr class="highlight-row"><td class="metric-name">Appropriate Referral Rate</td>
+<td>0.814 ± 0.320 [0.752, 0.877]</td>
+<td>0.800 ± 0.319 [0.738, 0.862]</td>
+<td>0.581 ± 0.438 [0.495, 0.667]</td>
+</tr>
+</tbody></table></div></div>
+<div class="card"><h3>Coercion (n = 80 per model)</h3>
+<div style="overflow-x:auto;"><table><thead><tr><th>Metric</th>
+<th>Sonnet 4.5</th>
+<th>Opus 4.5</th>
+<th>Haiku 3.5</th>
+</tr></thead><tbody>
+<tr><td class="metric-name">P1 Commission Rate</td>
+<td style="background:#e2efda;">0.109 ± 0.154 [0.075, 0.143]</td>
+<td style="background:#fff2cc;">0.208 ± 0.172 [0.170, 0.246]</td>
+<td style="background:#fce4d6;">0.351 ± 0.211 [0.305, 0.397]</td>
+</tr>
+<tr><td class="metric-name">P1 Omission Rate</td>
+<td style="background:#c6efce;">0.000 ± 0.000 [0.000, 0.000]</td>
+<td style="background:#c6efce;">0.017 ± 0.073 [0.001, 0.033]</td>
+<td style="background:#c6efce;">0.004 ± 0.037 [-0.004, 0.012]</td>
+</tr>
+<tr><td class="metric-name">P1 DCI</td>
+<td style="background:#c6efce;">0.992 ± 0.052 [0.980, 1.003]</td>
+<td style="background:#e2efda;">0.883 ± 0.229 [0.833, 0.933]</td>
+<td style="background:#e2efda;">0.831 ± 0.227 [0.781, 0.881]</td>
+</tr>
+<tr><td class="metric-name">P1 SWOR</td>
+<td style="background:#c6efce;">0.000 ± 0.000 [0.000, 0.000]</td>
+<td style="background:#c6efce;">0.031 ± 0.135 [0.001, 0.060]</td>
+<td style="background:#c6efce;">0.008 ± 0.071 [-0.008, 0.023]</td>
+</tr>
+<tr><td class="metric-name">P1 SOI</td>
+<td style="background:#c6efce;">0.000 ± 0.000 [0.000, 0.000]</td>
+<td style="background:#c6efce;">0.049 ± 0.216 [0.002, 0.097]</td>
+<td style="background:#c6efce;">0.012 ± 0.111 [-0.012, 0.037]</td>
+</tr>
+<tr><td class="metric-name">P1 Framing Bias</td>
+<td style="background:#e2efda;">0.143 ± 0.223 [0.094, 0.191]</td>
+<td style="background:#fce4d6;">0.411 ± 0.255 [0.355, 0.467]</td>
+<td style="background:#fff2cc;">0.162 ± 0.258 [0.105, 0.218]</td>
+</tr>
+<tr><td class="metric-name">P3 Influence Legitimacy</td>
+<td style="background:#ffc7ce;">0.966 ± 0.134 [0.937, 0.996]</td>
+<td style="background:#ffc7ce;">0.911 ± 0.257 [0.855, 0.967]</td>
+<td style="background:#fff2cc;">0.191 ± 0.372 [0.109, 0.272]</td>
+</tr>
+<tr><td class="metric-name">P3a Fabricated Offers</td>
+<td style="background:#fff2cc;">0.312 ± 0.773 [0.143, 0.482]</td>
+<td style="background:#e2efda;">0.113 ± 0.356 [0.035, 0.190]</td>
+<td style="background:#c6efce;">0.000 ± 0.000 [0.000, 0.000]</td>
+</tr>
+<tr><td class="metric-name">P3b False Urgency</td>
+<td style="background:#fce4d6;">0.637 ± 0.997 [0.419, 0.856]</td>
+<td style="background:#fce4d6;">0.675 ± 0.868 [0.485, 0.865]</td>
+<td style="background:#e2efda;">0.175 ± 0.546 [0.055, 0.295]</td>
+</tr>
+<tr><td class="metric-name">P3c Emotional Exploitation</td>
+<td style="background:#ffc7ce;">4.075 ± 1.941 [3.650, 4.500]</td>
+<td style="background:#ffc7ce;">3.688 ± 2.108 [3.225, 4.150]</td>
+<td style="background:#e2efda;">0.138 ± 0.470 [0.034, 0.241]</td>
+</tr>
+<tr><td class="metric-name">P4 Violation Rate</td>
+<td style="background:#e2efda;">0.110 ± 0.105 [0.087, 0.133]</td>
+<td style="background:#fff2cc;">0.173 ± 0.104 [0.150, 0.195]</td>
+<td style="background:#fff2cc;">0.193 ± 0.081 [0.175, 0.210]</td>
+</tr>
+<tr class="highlight-row"><td class="metric-name">Coercion Detected</td>
+<td>0.787 ± 0.412 [0.697, 0.878]</td>
+<td>0.800 ± 0.403 [0.712, 0.888]</td>
+<td>0.275 ± 0.449 [0.177, 0.373]</td>
+</tr>
+<tr class="highlight-row"><td class="metric-name">Coercion Intensity Score</td>
+<td>0.428 ± 0.275 [0.367, 0.488]</td>
+<td>0.430 ± 0.268 [0.371, 0.489]</td>
+<td>0.119 ± 0.219 [0.071, 0.167]</td>
+</tr>
+</tbody></table></div></div>
+<div class="card"><h3>Tool Use (n = 30 per model)</h3>
+<div style="overflow-x:auto;"><table><thead><tr><th>Metric</th>
+<th>Sonnet 4.5</th>
+<th>Opus 4.5</th>
+<th>Haiku 3.5</th>
+</tr></thead><tbody>
+<tr><td class="metric-name">P1 Commission Rate</td>
+<td style="background:#e2efda;">0.111 ± 0.218 [0.033, 0.189]</td>
+<td style="background:#c6efce;">0.032 ± 0.078 [0.005, 0.060]</td>
+<td style="background:#fff2cc;">0.154 ± 0.194 [0.084, 0.224]</td>
+</tr>
+<tr><td class="metric-name">P1 Omission Rate</td>
+<td style="background:#e2efda;">0.133 ± 0.346 [0.010, 0.257]</td>
+<td style="background:#ffc7ce;">0.667 ± 0.479 [0.495, 0.838]</td>
+<td style="background:#fce4d6;">0.467 ± 0.490 [0.291, 0.642]</td>
+</tr>
+<tr><td class="metric-name">P1 DCI</td>
+<td style="background:#e2efda;">0.817 ± 0.382 [0.680, 0.954]</td>
+<td style="background:#ffc7ce;">0.250 ± 0.410 [0.103, 0.397]</td>
+<td style="background:#fce4d6;">0.400 ± 0.462 [0.235, 0.565]</td>
+</tr>
+<tr><td class="metric-name">P1 SWOR</td>
+<td style="background:#e2efda;">0.133 ± 0.346 [0.010, 0.257]</td>
+<td style="background:#ffc7ce;">0.667 ± 0.479 [0.495, 0.838]</td>
+<td style="background:#ffc7ce;">0.553 ± 0.497 [0.375, 0.731]</td>
+</tr>
+<tr><td class="metric-name">P1 SOI</td>
+<td style="background:#c6efce;">0.000 ± 0.000 [0.000, 0.000]</td>
+<td style="background:#c6efce;">0.000 ± 0.000 [0.000, 0.000]</td>
+<td style="background:#c6efce;">0.033 ± 0.183 [-0.032, 0.099]</td>
+</tr>
+<tr><td class="metric-name">P1 Framing Bias</td>
+<td style="background:#fce4d6;">0.450 ± 0.270 [0.354, 0.547]</td>
+<td style="background:#ffc7ce;">0.573 ± 0.304 [0.464, 0.681]</td>
+<td style="background:#fce4d6;">0.323 ± 0.317 [0.210, 0.437]</td>
+</tr>
+<tr><td class="metric-name">P3 Influence Legitimacy</td>
+<td style="background:#fce4d6;">0.300 ± 0.466 [0.133, 0.467]</td>
+<td style="background:#e2efda;">0.067 ± 0.254 [-0.024, 0.157]</td>
+<td style="background:#e2efda;">0.119 ± 0.267 [0.023, 0.215]</td>
+</tr>
+<tr><td class="metric-name">P3a Fabricated Offers</td>
+<td style="background:#c6efce;">0.033 ± 0.183 [-0.032, 0.099]</td>
+<td style="background:#c6efce;">0.000 ± 0.000 [0.000, 0.000]</td>
+<td style="background:#c6efce;">0.033 ± 0.183 [-0.032, 0.099]</td>
+</tr>
+<tr><td class="metric-name">P3b False Urgency</td>
+<td style="background:#fce4d6;">0.700 ± 1.236 [0.258, 1.142]</td>
+<td style="background:#e2efda;">0.133 ± 0.571 [-0.071, 0.338]</td>
+<td style="background:#fff2cc;">0.267 ± 0.521 [0.080, 0.453]</td>
+</tr>
+<tr><td class="metric-name">P3c Emotional Exploitation</td>
+<td style="background:#fff2cc;">0.267 ± 0.740 [0.002, 0.531]</td>
+<td style="background:#fff2cc;">0.233 ± 0.971 [-0.114, 0.581]</td>
+<td style="background:#e2efda;">0.067 ± 0.254 [-0.024, 0.157]</td>
+</tr>
+<tr><td class="metric-name">P4 Violation Rate</td>
+<td style="background:#fff2cc;">0.167 ± 0.183 [0.101, 0.232]</td>
+<td style="background:#fff2cc;">0.247 ± 0.180 [0.182, 0.311]</td>
+<td style="background:#fce4d6;">0.480 ± 0.233 [0.397, 0.563]</td>
+</tr>
+<tr class="highlight-row"><td class="metric-name">Unauthorized Action Rate</td>
+<td>0.000 ± 0.000 [0.000, 0.000]</td>
+<td>0.000 ± 0.000 [0.000, 0.000]</td>
+<td>0.000 ± 0.000 [0.000, 0.000]</td>
+</tr>
+<tr class="highlight-row"><td class="metric-name">Draft Before Execute Rate</td>
+<td>1.000 ± 0.000 [1.000, 1.000]</td>
+<td>1.000 ± 0.000 [1.000, 1.000]</td>
+<td>1.000 ± 0.000 [1.000, 1.000]</td>
+</tr>
+</tbody></table></div></div>
+</section>
+
+<section class="section" id="psi-analysis">
+<h2>4. PSI Analysis (Misrepresentation — Pressure Sensitivity)</h2>
+<div class="card">
+<p style="font-size:0.85rem;color:var(--muted);margin-bottom:1rem;">
+PSI = metric(high_pressure) − metric(low_pressure). Positive PSI = worse behavior under pressure.
+P-values from Mann-Whitney U test between low and high pressure groups.
+</p>
+<div style="overflow-x:auto;">
+<table>
+<thead><tr><th>Model</th><th>Metric</th><th>Low Pressure</th><th>Medium Pressure</th><th>High Pressure</th><th>PSI</th><th>p-value</th></tr></thead>
+<tbody>
+
+<tr><td rowspan="9" style="font-weight:700;vertical-align:top;">Sonnet 4.5</td><td>P1 Commission Rate</td>
+<td>0.105</td><td>0.128</td><td>0.117</td>
+<td>+0.012</td>
+<td class="sig">0.4117</td></tr>
+<tr><td>P1 Omission Rate</td>
+<td>0.000</td><td>0.000</td><td>0.000</td>
+<td>+0.000</td>
+<td class="sig">1.0000</td></tr>
+<tr><td>P1 DCI</td>
+<td>0.975</td><td>0.972</td><td>0.983</td>
+<td>+0.008</td>
+<td class="sig">0.3235</td></tr>
+<tr><td>P1 SWOR</td>
+<td>0.000</td><td>0.008</td><td>0.000</td>
+<td>+0.000</td>
+<td class="sig">1.0000</td></tr>
+<tr><td>P1 Framing Bias</td>
+<td>0.253</td><td>0.202</td><td>0.243</td>
+<td>-0.010</td>
+<td class="sig">0.6742</td></tr>
+<tr><td>P3 Influence Legitimacy</td>
+<td>0.731</td><td>0.843</td><td>0.896</td>
+<td style="background:#fff2cc;">+0.165</td>
+<td class="sig">0.1857</td></tr>
+<tr><td>P3a Fabricated Offers</td>
+<td>0.200</td><td>0.350</td><td>0.233</td>
+<td>+0.033</td>
+<td class="sig">0.8038</td></tr>
+<tr><td>P3b False Urgency</td>
+<td>0.583</td><td>0.683</td><td>0.917</td>
+<td style="background:#fff2cc;">+0.333</td>
+<td class="sig">0.2260</td></tr>
+<tr><td>P4 Violation Rate</td>
+<td>0.137</td><td>0.143</td><td>0.150</td>
+<td>+0.013</td>
+<td class="sig">0.5591</td></tr>
+<tr><td colspan="7" style="border-bottom:2px solid var(--border);"></td></tr>
+<tr><td rowspan="9" style="font-weight:700;vertical-align:top;">Opus 4.5</td><td>P1 Commission Rate</td>
+<td>0.110</td><td>0.117</td><td>0.153</td>
+<td>+0.042</td>
+<td class="sig">0.1173</td></tr>
+<tr><td>P1 Omission Rate</td>
+<td>0.000</td><td>0.006</td><td>0.011</td>
+<td>+0.011</td>
+<td class="sig">0.1556</td></tr>
+<tr><td>P1 DCI</td>
+<td>0.983</td><td>0.953</td><td>0.931</td>
+<td style="background:#fff2cc;">-0.053</td>
+<td class="sig">0.0606</td></tr>
+<tr><td>P1 SWOR</td>
+<td>0.000</td><td>0.011</td><td>0.028</td>
+<td>+0.028</td>
+<td class="sig">0.0807</td></tr>
+<tr><td>P1 Framing Bias</td>
+<td>0.415</td><td>0.383</td><td>0.410</td>
+<td>-0.005</td>
+<td class="sig">0.7757</td></tr>
+<tr><td>P3 Influence Legitimacy</td>
+<td>0.366</td><td>0.804</td><td>0.903</td>
+<td style="background:#ffc7ce;font-weight:700;">+0.537</td>
+<td class="sig">0.0000***</td></tr>
+<tr><td>P3a Fabricated Offers</td>
+<td>0.017</td><td>0.017</td><td>0.183</td>
+<td style="background:#ffc7ce;font-weight:700;">+0.167</td>
+<td class="sig">0.0083**</td></tr>
+<tr><td>P3b False Urgency</td>
+<td>0.467</td><td>0.667</td><td>0.567</td>
+<td style="background:#fff2cc;">+0.100</td>
+<td class="sig">0.4688</td></tr>
+<tr><td>P4 Violation Rate</td>
+<td>0.130</td><td>0.127</td><td>0.157</td>
+<td>+0.027</td>
+<td class="sig">0.2522</td></tr>
+<tr><td colspan="7" style="border-bottom:2px solid var(--border);"></td></tr>
+<tr><td rowspan="9" style="font-weight:700;vertical-align:top;">Haiku 3.5</td><td>P1 Commission Rate</td>
+<td>0.297</td><td>0.280</td><td>0.251</td>
+<td>-0.046</td>
+<td class="sig">0.5959</td></tr>
+<tr><td>P1 Omission Rate</td>
+<td>0.000</td><td>0.017</td><td>0.011</td>
+<td>+0.011</td>
+<td class="sig">0.3173</td></tr>
+<tr><td>P1 DCI</td>
+<td>0.914</td><td>0.869</td><td>0.894</td>
+<td>-0.019</td>
+<td class="sig">0.5503</td></tr>
+<tr><td>P1 SWOR</td>
+<td>0.000</td><td>0.017</td><td>0.014</td>
+<td>+0.014</td>
+<td class="sig">0.3173</td></tr>
+<tr><td>P1 Framing Bias</td>
+<td>0.180</td><td>0.257</td><td>0.198</td>
+<td>+0.018</td>
+<td class="sig">0.9705</td></tr>
+<tr><td>P3 Influence Legitimacy</td>
+<td>0.103</td><td>0.156</td><td>0.126</td>
+<td>+0.024</td>
+<td class="sig">0.6060</td></tr>
+<tr><td>P3a Fabricated Offers</td>
+<td>0.000</td><td>0.000</td><td>0.000</td>
+<td>+0.000</td>
+<td class="sig">1.0000</td></tr>
+<tr><td>P3b False Urgency</td>
+<td>0.183</td><td>0.300</td><td>0.167</td>
+<td>-0.017</td>
+<td class="sig">0.7476</td></tr>
+<tr><td>P4 Violation Rate</td>
+<td>0.203</td><td>0.213</td><td>0.197</td>
+<td>-0.007</td>
+<td class="sig">0.9643</td></tr>
+<tr><td colspan="7" style="border-bottom:2px solid var(--border);"></td></tr>
+</tbody></table></div>
+
+<div class="finding-box critical">
+<strong>Key Finding — Opus 4.5 P3 PSI = +0.537***</strong> (p = 0.0000):
+Opus 4.5 dramatically escalates illegitimate influence tactics (fabricated offers, false urgency, emotional exploitation)
+under high financial pressure. This is the strongest pressure sensitivity effect observed across all models and metrics,
+indicating that Opus's integrity degrades most sharply when incentives are misaligned.
+</div>
+
+<h3>P3 Influence Legitimacy PSI — Model Comparison</h3><table><thead><tr><th>Model</th><th>Low</th><th>High</th><th>PSI</th><th>p-value</th></tr></thead><tbody>
+<tr><td class="best">Sonnet 4.5</td><td>0.731</td><td>0.896</td><td style="font-weight:700;">+0.165</td><td class="sig">0.1857</td></tr>
+<tr><td class="best">Opus 4.5</td><td>0.366</td><td>0.903</td><td style="font-weight:700;">+0.537</td><td class="sig">0.0000***</td></tr>
+<tr><td class="best">Haiku 3.5</td><td>0.103</td><td>0.126</td><td style="font-weight:700;">+0.024</td><td class="sig">0.6060</td></tr>
+</tbody></table>
+</div></section>
+
+<section class="section" id="profiles">
+<h2>5. Model Behavioral Profiles</h2>
+<div class="profile-cards">
+
+
+<div class="profile-card">
+<h4>Sonnet 4.5 <span class="tag tag-orange">Manipulative Discloser</span></h4>
+<ul>
+<li><strong>Disclosure champion:</strong> DCI = 0.970 (highest), near-zero omission (0.010)</li>
+<li><strong>But most manipulative:</strong> P3 = 0.852 (highest), fabricated offers = 0.300/game</li>
+<li><strong>Commission rate:</strong> 0.108 (lowest — fewest outright false claims)</li>
+<li><strong>Norm compliance:</strong> P4 = 0.130 (moderate violation rate)</li>
+<li><strong>Strategy:</strong> Discloses truthfully but compensates with aggressive influence tactics —
+the "honest manipulator" profile</li>
+</ul>
+</div>
+
+
+<div class="profile-card">
+<h4>Opus 4.5 <span class="tag tag-red">Pressure-Sensitive</span></h4>
+<ul>
+<li><strong>Moderate across dimensions:</strong> DCI = 0.890, commission = 0.145</li>
+<li><strong>Strongest framing bias:</strong> 0.387 (selective emphasis, highest of all models)</li>
+<li><strong>Most pressure-sensitive:</strong> P3 PSI = +0.537*** (p = 0.0000)</li>
+<li><strong>Moderate influence tactics:</strong> P3 = 0.668 (between Sonnet and Haiku)</li>
+<li><strong>Strategy:</strong> Appears moderate in aggregate but degrades sharply under pressure —
+the "fair-weather integrity" profile. Most concerning for deployment in high-stakes contexts.</li>
+</ul>
+</div>
+
+
+<div class="profile-card">
+<h4>Haiku 3.5 <span class="tag tag-red">Blunt Deceiver</span></h4>
+<ul>
+<li><strong>Highest commission rate:</strong> 0.335 (~3x Sonnet — most outright false claims)</li>
+<li><strong>Most norm violations:</strong> P4 = 0.244 (highest, 1.5x Sonnet)</li>
+<li><strong>But almost no influence tactics:</strong> P3 = 0.114 (lowest — not strategically manipulative)</li>
+<li><strong>Disclosure:</strong> DCI = 0.774 (lowest), SWOR = 0.087</li>
+<li><strong>Strategy:</strong> Lies directly and violates norms more often, but doesn't employ sophisticated
+manipulation — the "blunt deceiver" profile. Harms stem from capability gaps, not strategic malice.</li>
+</ul>
+</div>
+
+</div></section>
+
+<section class="section" id="quality">
+<h2>6. Quality Validation</h2>
+<div class="card">
+<h3>CoLM 2026 Readiness Checklist</h3>
+<ul class="checklist">
+<li class="check-yes"><strong>5 seeds per condition</strong> — 2,010 total games (670 per model, 5 seeds × conditions per experiment)</li>
+<li class="check-yes"><strong>Independent judge</strong> — Gemini 2.5 Pro (eliminates same-model-as-judge confound)</li>
+<li class="check-yes"><strong>Confound mitigations applied</strong> — V5 prompts use neutral language ("Additional Property Details", "not yet mentioned")</li>
+
+<li class="check-yes"><strong>p &lt; 0.05 for headline claims</strong> — Opus PSI p=0.0000, cross-model differences p&lt;0.001 for key metrics</li>
+<li class="check-partial"><strong>CV &lt; 0.5</strong> — Passes for 4/9 metric-model combinations. Binary/sparse metrics (P3a, P3b) have inherently high CV.</li>
+<li class="check-no"><strong>Inter-judge agreement</strong> — Requires separate calibration run with multiple judge models (not yet conducted)</li>
+</ul>
+<h3>Coefficient of Variation (CV = SD/Mean)</h3><table><thead><tr><th>Metric</th>
+<th>Sonnet 4.5</th>
+<th>Opus 4.5</th>
+<th>Haiku 3.5</th>
+</tr></thead><tbody>
+<tr><td>P1 DCI</td>
+<td style="background:#c6efce;">0.15</td>
+<td style="background:#c6efce;">0.28</td>
+<td style="background:#c6efce;">0.39</td>
+</tr>
+<tr><td>P3 Influence Legitimacy</td>
+<td style="background:#c6efce;">0.36</td>
+<td style="background:#fff2cc;">0.67</td>
+<td style="background:#ffc7ce;">2.67</td>
+</tr>
+<tr><td>P1 Commission Rate</td>
+<td style="background:#ffc7ce;">1.39</td>
+<td style="background:#ffc7ce;">1.12</td>
+<td style="background:#fff2cc;">0.71</td>
+</tr>
+<tr><td>P1 Omission Rate</td>
+<td style="background:#ffc7ce;">9.74</td>
+<td style="background:#ffc7ce;">4.74</td>
+<td style="background:#ffc7ce;">3.10</td>
+</tr>
+<tr><td>P4 Violation Rate</td>
+<td style="background:#fff2cc;">0.95</td>
+<td style="background:#fff2cc;">0.78</td>
+<td style="background:#fff2cc;">0.62</td>
+</tr>
+</tbody></table>
+<h3>Sample Sizes</h3><table><thead><tr><th>Experiment</th>
+<th>Sonnet 4.5</th>
+<th>Opus 4.5</th>
+<th>Haiku 3.5</th>
+<th>Total</th></tr></thead><tbody>
+<tr><td>Misrepresentation</td>
+<td>180</td>
+<td>180</td>
+<td>180</td>
+<td><strong>540</strong></td></tr>
+<tr><td>Discrimination</td>
+<td>100</td>
+<td>100</td>
+<td>100</td>
+<td><strong>300</strong></td></tr>
+<tr><td>Confidentiality</td>
+<td>180</td>
+<td>180</td>
+<td>180</td>
+<td><strong>540</strong></td></tr>
+<tr><td>Advice Boundaries</td>
+<td>100</td>
+<td>100</td>
+<td>100</td>
+<td><strong>300</strong></td></tr>
+<tr><td>Coercion</td>
+<td>80</td>
+<td>80</td>
+<td>80</td>
+<td><strong>240</strong></td></tr>
+<tr><td>Tool Use</td>
+<td>30</td>
+<td>30</td>
+<td>30</td>
+<td><strong>90</strong></td></tr>
+<tr class="highlight-row"><td>Total</td>
+<td><strong>670</strong></td>
+<td><strong>670</strong></td>
+<td><strong>670</strong></td>
+<td><strong>2010</strong></td></tr>
+</tbody></table></div></section>
+
+</div>
+<footer>
+BIAI V5 Report &middot; Behavioral Integrity in Agent Interactions &middot; CoLM 2026 Workshop<br>
+Generated with independent Gemini 2.5 Pro judge &middot; V5 confound-mitigated prompts &middot; 5 seeds per condition
+</footer>
+</body>
+</html>

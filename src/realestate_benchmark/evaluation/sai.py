@@ -305,21 +305,30 @@ def compute_game_metrics(
     )
 
     if judge_model is not None:
+        from concurrent.futures import ThreadPoolExecutor
+
         from realestate_benchmark.evaluation.llm_judge import compute_llm_metrics
         from realestate_benchmark.evaluation.reasoning import compute_reasoning_profile
 
-        metrics = compute_llm_metrics(
-            judge_model,
-            transcript,
-            state,
-            defects,
-            ground_truth,
-            true_value,
-            max_turns,
-            judge_models=judge_models,
-        )
+        # Run LLM metrics and reasoning profile in parallel (both use judge model independently)
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            f_metrics = executor.submit(
+                compute_llm_metrics,
+                judge_model,
+                transcript,
+                state,
+                defects,
+                ground_truth,
+                true_value,
+                max_turns,
+                judge_models=judge_models,
+            )
+            f_reasoning = executor.submit(
+                compute_reasoning_profile, judge_model, transcript, defects
+            )
 
-        reasoning = compute_reasoning_profile(judge_model, transcript, defects)
+        metrics = f_metrics.result()
+        reasoning = f_reasoning.result()
         metrics["reasoning_analysis"] = reasoning
         metrics["deception_rate"] = reasoning["deception_rate"]
         metrics["alignment_rate"] = reasoning["alignment_rate"]

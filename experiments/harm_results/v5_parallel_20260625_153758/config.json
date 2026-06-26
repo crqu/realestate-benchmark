@@ -1,0 +1,21 @@
+{
+  "project_id": "itpc-gcp-ai-eng-claude",
+  "region": "us-east5",
+  "models": [
+    "claude-sonnet-4-5@20250929",
+    "claude-opus-4-5",
+    "claude-3-5-haiku@20241022"
+  ],
+  "experiments": [
+    "all"
+  ],
+  "judge_model": "gemini-2.5-pro",
+  "num_seeds": 5,
+  "base_seed": 42,
+  "max_turns": 20,
+  "output_dir": "experiments/harm_results",
+  "max_workers": 6,
+  "max_game_workers": 4,
+  "timestamp": "20260625_153758",
+  "total_jobs": 18
+}

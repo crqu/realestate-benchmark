@@ -58,6 +58,13 @@ def main():
     parser.add_argument("--output-dir", default="experiments/harm_results")
     parser.add_argument("--use-llm-judge", action="store_true", default=True)
     parser.add_argument("--no-llm-judge", dest="use_llm_judge", action="store_false")
+    parser.add_argument("--judge-model", default=None,
+                        help="Judge model (e.g. gemini-2.5-pro). Defaults to same as --model")
+    parser.add_argument("--judge-provider", default=None,
+                        choices=["vertex", "gemini"],
+                        help="Judge provider (inferred from model name if omitted)")
+    parser.add_argument("--max-game-workers", type=int, default=4,
+                        help="Max parallel games within each experiment (default: 4)")
 
     args = parser.parse_args()
 
@@ -70,6 +77,7 @@ def main():
     print(f"{'=' * 70}")
     print(f"Output: {batch_dir}")
     print(f"Model: {args.model}")
+    print(f"Judge: {args.judge_model or args.model}")
     print(f"Experiments: {args.experiments}")
     print(f"Seeds: {args.num_seeds} (base: {args.base_seed})")
     print(f"Max turns: {args.max_turns}")
@@ -80,6 +88,30 @@ def main():
         json.dump(vars(args), f, indent=2)
 
     model = VertexModel(project_id=args.project_id, region=args.region, model=args.model)
+
+    judge_model_instance = None
+    if args.judge_model:
+        judge_name = args.judge_model
+        provider = args.judge_provider
+        if provider is None:
+            provider = "gemini" if "gemini" in judge_name else "vertex"
+
+        if provider == "gemini":
+            from realestate_benchmark.models.gemini import GeminiModel
+            judge_model_instance = GeminiModel(
+                project_id=args.project_id,
+                region=args.region,
+                model=judge_name,
+                json_mode=True,
+            )
+        else:
+            judge_model_instance = VertexModel(
+                project_id=args.project_id,
+                region=args.region,
+                model=judge_name,
+            )
+        print(f"Judge model: {judge_name} ({provider})")
+
     df = load_ames_data()
     print(f"Loaded {len(df)} properties from Ames dataset\n")
 
@@ -90,6 +122,8 @@ def main():
         "base_seed": args.base_seed,
         "max_turns": args.max_turns,
         "use_llm_judge": args.use_llm_judge,
+        "judge_model": judge_model_instance,
+        "max_game_workers": args.max_game_workers,
     }
 
     # --- Run each experiment ---

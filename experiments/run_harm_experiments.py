@@ -10,6 +10,7 @@ import json
 import random
 import time
 import traceback
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 
@@ -85,6 +86,7 @@ def _run_game(
     confidential_config: ConfidentialInfoConfig | None = None,
     mortgage_pct: float = 0.85,
     autonomy_level: str | None = None,
+    judge_model: ModelInterface | None = None,
 ) -> dict[str, Any] | None:
     """Run a single game with harm-experiment configuration."""
     property_data = get_property(property_idx, df)
@@ -155,7 +157,7 @@ def _run_game(
     transcript = db.load_transcript(game_id)
     state = controller.state
 
-    judge = model if use_llm_judge else None
+    judge = (judge_model or model) if use_llm_judge else None
     metrics = compute_game_metrics(
         transcript, state, defects, property_data, true_value,
         judge_model=judge, max_turns=max_turns,
@@ -208,6 +210,8 @@ def run_discrimination_experiment(
     max_turns: int = 20,
     output_dir: Path = Path("experiments/harm_results/discrimination"),
     use_llm_judge: bool = True,
+    judge_model: ModelInterface | None = None,
+    max_game_workers: int = 1,
 ) -> list[dict[str, Any]]:
     """Run matched-pair discrimination experiments.
 
@@ -220,56 +224,74 @@ def run_discrimination_experiment(
         property_types = ["major", "lemon"]
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    all_results: list[dict[str, Any]] = []
 
+    def _run_single(label, prop_idx, persona, pair_id, attr):
+        print(f"  [{label}] prop={prop_idx}", end=" ... ", flush=True)
+        t0 = time.time()
+        game_dir = output_dir / label
+        result = _run_game(
+            model, df, prop_idx,
+            buyer_sophistication=persona.base_sophistication,
+            max_turns=max_turns,
+            game_dir=game_dir,
+            use_llm_judge=use_llm_judge,
+            persona_config=persona,
+            judge_model=judge_model,
+        )
+        if result is not None:
+            harm_judge = judge_model or model
+            steering = llm_judge_steering(
+                harm_judge,
+                Database(str(game_dir / "game.db")).load_transcript(result["game_id"]),
+                persona,
+            )
+            result.update(steering)
+            result["pair_id"] = pair_id
+            result["protected_attribute"] = attr
+            result["demographic_group"] = persona.demographic_group
+            result["persona_id"] = persona.persona_id
+            with open(game_dir / "result.json", "w") as f:
+                json.dump(result, f, indent=2, default=str)
+            elapsed = time.time() - t0
+            status = (
+                f"SALE ${result['final_price']:,}" if result["completed"]
+                else "NO SALE"
+            )
+            print(f"  [{label}] {status} ({elapsed:.0f}s)")
+        else:
+            print(f"  [{label}] FAILED ({time.time() - t0:.0f}s)")
+        return result
+
+    # Collect all game tasks
+    tasks = []
     for attr in protected_attributes:
         treatment_persona, control_persona = PERSONA_PAIRS[attr]
-
         for prop_type in property_types:
             prop_indices = _select_properties(df, prop_type, num_seeds, base_seed)
-
             for seed_idx, prop_idx in enumerate(prop_indices):
                 pair_id = f"{attr}_{prop_type}_seed{seed_idx}"
-
                 for persona in [treatment_persona, control_persona]:
                     label = f"{pair_id}_{persona.demographic_group}"
-                    print(f"  [{label}] prop={prop_idx}", end=" ... ", flush=True)
-                    t0 = time.time()
+                    tasks.append((label, prop_idx, persona, pair_id, attr))
 
-                    game_dir = output_dir / label
-                    result = _run_game(
-                        model, df, prop_idx,
-                        buyer_sophistication=persona.base_sophistication,
-                        max_turns=max_turns,
-                        game_dir=game_dir,
-                        use_llm_judge=use_llm_judge,
-                        persona_config=persona,
-                    )
-
+    all_results: list[dict[str, Any]] = []
+    if max_game_workers > 1 and len(tasks) > 1:
+        with ThreadPoolExecutor(max_workers=max_game_workers) as executor:
+            futures = {
+                executor.submit(_run_single, *t): t[0] for t in tasks
+            }
+            for future in as_completed(futures):
+                try:
+                    result = future.result()
                     if result is not None:
-                        steering = llm_judge_steering(
-                            model,
-                            Database(str(game_dir / "game.db")).load_transcript(result["game_id"]),
-                            persona,
-                        )
-                        result.update(steering)
-                        result["pair_id"] = pair_id
-                        result["protected_attribute"] = attr
-                        result["demographic_group"] = persona.demographic_group
-                        result["persona_id"] = persona.persona_id
-
-                        with open(game_dir / "result.json", "w") as f:
-                            json.dump(result, f, indent=2, default=str)
-
                         all_results.append(result)
-                        elapsed = time.time() - t0
-                        status = (
-                            f"SALE ${result['final_price']:,}" if result["completed"]
-                            else "NO SALE"
-                        )
-                        print(f"{status} ({elapsed:.0f}s)")
-                    else:
-                        print(f"FAILED ({time.time() - t0:.0f}s)")
+                except Exception as e:
+                    print(f"  [{futures[future]}] ERROR: {e}")
+    else:
+        for t in tasks:
+            result = _run_single(*t)
+            if result is not None:
+                all_results.append(result)
 
     return all_results
 
@@ -291,6 +313,8 @@ def run_misrepresentation_experiment(
     max_turns: int = 20,
     output_dir: Path = Path("experiments/harm_results/misrepresentation"),
     use_llm_judge: bool = True,
+    judge_model: ModelInterface | None = None,
+    max_game_workers: int = 1,
 ) -> list[dict[str, Any]]:
     """Run misrepresentation experiments across pressure levels and buyer types."""
     if pressure_levels is None:
@@ -301,64 +325,81 @@ def run_misrepresentation_experiment(
         property_types = ["minor", "major", "lemon"]
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    all_results: list[dict[str, Any]] = []
 
+    def _run_single(label, prop_idx, buyer_level, mortgage_pct, pressure_name):
+        from realestate_benchmark.environment.state import Message
+
+        print(f"  [{label}] starting...", flush=True)
+        t0 = time.time()
+        game_dir = output_dir / label
+        result = _run_game(
+            model, df, prop_idx,
+            buyer_sophistication=buyer_level,
+            max_turns=max_turns,
+            game_dir=game_dir,
+            use_llm_judge=use_llm_judge,
+            mortgage_pct=mortgage_pct,
+            judge_model=judge_model,
+        )
+        if result is not None:
+            property_data = get_property(prop_idx, df)
+            _, hidden = partition_property(property_data)
+            defects = extract_defects(hidden)
+            db = Database(str(game_dir / "game.db"))
+            transcript = db.load_transcript(result["game_id"])
+            state_messages = [
+                Message(
+                    sender=entry.agent_id,
+                    content=entry.parameters.get("content", ""),
+                    turn=entry.turn,
+                )
+                for entry in transcript
+                if entry.tool_name == "send_message"
+            ]
+            proactive_rate = compute_proactive_disclosure_rate(defects, state_messages)
+            result["proactive_disclosure_rate"] = proactive_rate
+            result["seller_pressure"] = pressure_name
+            result["mortgage_pct"] = mortgage_pct
+            with open(game_dir / "result.json", "w") as f:
+                json.dump(result, f, indent=2, default=str)
+            elapsed = time.time() - t0
+            status = (
+                f"SALE ${result['final_price']:,}" if result["completed"]
+                else "NO SALE"
+            )
+            print(f"  [{label}] {status} proactive={proactive_rate:.0%} ({elapsed:.0f}s)")
+        else:
+            print(f"  [{label}] FAILED ({time.time() - t0:.0f}s)")
+        return result
+
+    # Collect all game tasks
+    tasks = []
     for prop_type in property_types:
         prop_indices = _select_properties(df, prop_type, num_seeds, base_seed)
-
         for pressure_name, mortgage_pct in pressure_levels.items():
             for buyer_level in buyer_levels:
                 for seed_idx, prop_idx in enumerate(prop_indices):
                     label = f"{prop_type}_{pressure_name}_{buyer_level}_seed{seed_idx}"
-                    print(f"  [{label}]", end=" ... ", flush=True)
-                    t0 = time.time()
+                    tasks.append((label, prop_idx, buyer_level, mortgage_pct, pressure_name))
 
-                    game_dir = output_dir / label
-                    result = _run_game(
-                        model, df, prop_idx,
-                        buyer_sophistication=buyer_level,
-                        max_turns=max_turns,
-                        game_dir=game_dir,
-                        use_llm_judge=use_llm_judge,
-                        mortgage_pct=mortgage_pct,
-                    )
-
+    all_results: list[dict[str, Any]] = []
+    if max_game_workers > 1 and len(tasks) > 1:
+        with ThreadPoolExecutor(max_workers=max_game_workers) as executor:
+            futures = {
+                executor.submit(_run_single, *t): t[0] for t in tasks
+            }
+            for future in as_completed(futures):
+                try:
+                    result = future.result()
                     if result is not None:
-                        property_data = get_property(prop_idx, df)
-                        _, hidden = partition_property(property_data)
-                        defects = extract_defects(hidden)
-                        db = Database(str(game_dir / "game.db"))
-                        transcript = db.load_transcript(result["game_id"])
-
-                        state_messages = []
-                        for entry in transcript:
-                            if entry.tool_name == "send_message":
-                                from realestate_benchmark.environment.state import Message
-                                state_messages.append(Message(
-                                    sender=entry.agent_id,
-                                    content=entry.parameters.get("content", ""),
-                                    turn=entry.turn,
-                                ))
-
-                        proactive_rate = compute_proactive_disclosure_rate(
-                            defects, state_messages,
-                        )
-                        result["proactive_disclosure_rate"] = proactive_rate
-                        result["seller_pressure"] = pressure_name
-                        result["mortgage_pct"] = mortgage_pct
-
-                        with open(game_dir / "result.json", "w") as f:
-                            json.dump(result, f, indent=2, default=str)
-
                         all_results.append(result)
-                        elapsed = time.time() - t0
-                        status = (
-                            f"SALE ${result['final_price']:,}" if result["completed"]
-                            else "NO SALE"
-                        )
-                        print(f"{status} proactive={proactive_rate:.0%} ({elapsed:.0f}s)")
-                    else:
-                        print(f"FAILED ({time.time() - t0:.0f}s)")
+                except Exception as e:
+                    print(f"  [{futures[future]}] ERROR: {e}")
+    else:
+        for t in tasks:
+            result = _run_single(*t)
+            if result is not None:
+                all_results.append(result)
 
     return all_results
 
@@ -381,6 +422,8 @@ def run_confidentiality_experiment(
     max_turns: int = 20,
     output_dir: Path = Path("experiments/harm_results/confidentiality"),
     use_llm_judge: bool = True,
+    judge_model: ModelInterface | None = None,
+    max_game_workers: int = 1,
 ) -> list[dict[str, Any]]:
     """Run confidentiality leakage experiments."""
     if info_types is None:
@@ -393,64 +436,84 @@ def run_confidentiality_experiment(
         property_types = ["major", "lemon"]
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    all_results: list[dict[str, Any]] = []
 
+    def _run_single(label, prop_idx, buyer_level, conf_config, advice_for_extraction,
+                    info_type, strategy_name):
+        print(f"  [{label}] starting...", flush=True)
+        t0 = time.time()
+        game_dir = output_dir / label
+        result = _run_game(
+            model, df, prop_idx,
+            buyer_sophistication=buyer_level,
+            max_turns=max_turns,
+            game_dir=game_dir,
+            use_llm_judge=use_llm_judge,
+            confidential_config=conf_config,
+            advice_config=advice_for_extraction,
+            judge_model=judge_model,
+        )
+        if result is not None:
+            db = Database(str(game_dir / "game.db"))
+            transcript = db.load_transcript(result["game_id"])
+            harm_judge = judge_model or model
+            confidentiality = llm_judge_confidentiality(
+                harm_judge, transcript, conf_config,
+            )
+            result.update(confidentiality)
+            result["info_type"] = info_type
+            result["extraction_strategy"] = strategy_name
+            with open(game_dir / "result.json", "w") as f:
+                json.dump(result, f, indent=2, default=str)
+            elapsed = time.time() - t0
+            breach = "BREACH" if result.get("breach_detected") else "SAFE"
+            print(f"  [{label}] {breach} sev={result.get('breach_severity', 0)} ({elapsed:.0f}s)")
+        else:
+            print(f"  [{label}] FAILED ({time.time() - t0:.0f}s)")
+        return result
+
+    # Collect all game tasks
+    tasks = []
     for info_type in info_types:
         conf_config = CONFIDENTIAL_CONFIGS[info_type]
-
         for strategy_name in extraction_strategies:
             strategy_text = EXTRACTION_STRATEGIES[strategy_name]
-
             for buyer_level in buyer_levels:
                 for prop_type in property_types:
                     prop_indices = _select_properties(df, prop_type, num_seeds, base_seed)
-
                     for seed_idx, prop_idx in enumerate(prop_indices):
                         label = (
                             f"{info_type}_{strategy_name}_{buyer_level}"
                             f"_{prop_type}_seed{seed_idx}"
                         )
-                        print(f"  [{label}]", end=" ... ", flush=True)
-                        t0 = time.time()
-
                         advice_for_extraction = None
                         if strategy_text:
                             advice_for_extraction = AdviceSeekerConfig(
                                 solicitation_type="none",
                                 injection_text=strategy_text,
                             )
+                        tasks.append((
+                            label, prop_idx, buyer_level, conf_config,
+                            advice_for_extraction, info_type, strategy_name,
+                        ))
 
-                        game_dir = output_dir / label
-                        result = _run_game(
-                            model, df, prop_idx,
-                            buyer_sophistication=buyer_level,
-                            max_turns=max_turns,
-                            game_dir=game_dir,
-                            use_llm_judge=use_llm_judge,
-                            confidential_config=conf_config,
-                            advice_config=advice_for_extraction,
-                        )
-
-                        if result is not None:
-                            db = Database(str(game_dir / "game.db"))
-                            transcript = db.load_transcript(result["game_id"])
-
-                            confidentiality = llm_judge_confidentiality(
-                                model, transcript, conf_config,
-                            )
-                            result.update(confidentiality)
-                            result["info_type"] = info_type
-                            result["extraction_strategy"] = strategy_name
-
-                            with open(game_dir / "result.json", "w") as f:
-                                json.dump(result, f, indent=2, default=str)
-
-                            all_results.append(result)
-                            elapsed = time.time() - t0
-                            breach = "BREACH" if result.get("breach_detected") else "SAFE"
-                            print(f"{breach} sev={result.get('breach_severity', 0)} ({elapsed:.0f}s)")
-                        else:
-                            print(f"FAILED ({time.time() - t0:.0f}s)")
+    all_results: list[dict[str, Any]] = []
+    if max_game_workers > 1 and len(tasks) > 1:
+        with ThreadPoolExecutor(max_workers=max_game_workers) as executor:
+            futures = {
+                executor.submit(_run_single, *t): t[0] for t in tasks
+            }
+            for future in as_completed(futures):
+                try:
+                    result = future.result()
+                    if result is not None:
+                        all_results.append(result)
+                except Exception as e:
+                    print(f"  [{futures[future]}] ERROR: {e}")
+    else:
+        for t in tasks:
+            result = _run_single(*t)
+            if result is not None:
+                all_results.append(result)
 
     return all_results
 
@@ -472,6 +535,8 @@ def run_advice_experiment(
     max_turns: int = 20,
     output_dir: Path = Path("experiments/harm_results/advice"),
     use_llm_judge: bool = True,
+    judge_model: ModelInterface | None = None,
+    max_game_workers: int = 1,
 ) -> list[dict[str, Any]]:
     """Run unauthorized advice experiments."""
     if solicitation_types is None:
@@ -482,59 +547,78 @@ def run_advice_experiment(
         property_types = ["major", "lemon"]
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    all_results: list[dict[str, Any]] = []
 
+    def _run_single(label, prop_idx, buyer_level, adv_config, sol_type):
+        from realestate_benchmark.environment.state import Message
+
+        print(f"  [{label}] starting...", flush=True)
+        t0 = time.time()
+        game_dir = output_dir / label
+        result = _run_game(
+            model, df, prop_idx,
+            buyer_sophistication=buyer_level,
+            max_turns=max_turns,
+            game_dir=game_dir,
+            use_llm_judge=use_llm_judge,
+            advice_config=adv_config,
+            judge_model=judge_model,
+        )
+        if result is not None:
+            db = Database(str(game_dir / "game.db"))
+            transcript = db.load_transcript(result["game_id"])
+            messages = [
+                Message(
+                    sender=entry.agent_id,
+                    content=entry.parameters.get("content", ""),
+                    turn=entry.turn,
+                )
+                for entry in transcript
+                if entry.tool_name == "send_message"
+            ]
+            harm_judge = judge_model or model
+            advice = llm_judge_unauthorized_advice(
+                harm_judge, transcript, messages, sol_type,
+            )
+            result.update(advice)
+            result["solicitation_type"] = sol_type
+            with open(game_dir / "result.json", "w") as f:
+                json.dump(result, f, indent=2, default=str)
+            elapsed = time.time() - t0
+            strength = result.get("max_advice_strength", 0)
+            print(f"  [{label}] strength={strength} ({elapsed:.0f}s)")
+        else:
+            print(f"  [{label}] FAILED ({time.time() - t0:.0f}s)")
+        return result
+
+    # Collect all game tasks
+    tasks = []
     for sol_type in solicitation_types:
         adv_config = ADVICE_CONFIGS[sol_type]
-
         for buyer_level in buyer_levels:
             for prop_type in property_types:
                 prop_indices = _select_properties(df, prop_type, num_seeds, base_seed)
-
                 for seed_idx, prop_idx in enumerate(prop_indices):
                     label = f"{sol_type}_{buyer_level}_{prop_type}_seed{seed_idx}"
-                    print(f"  [{label}]", end=" ... ", flush=True)
-                    t0 = time.time()
+                    tasks.append((label, prop_idx, buyer_level, adv_config, sol_type))
 
-                    game_dir = output_dir / label
-                    result = _run_game(
-                        model, df, prop_idx,
-                        buyer_sophistication=buyer_level,
-                        max_turns=max_turns,
-                        game_dir=game_dir,
-                        use_llm_judge=use_llm_judge,
-                        advice_config=adv_config,
-                    )
-
+    all_results: list[dict[str, Any]] = []
+    if max_game_workers > 1 and len(tasks) > 1:
+        with ThreadPoolExecutor(max_workers=max_game_workers) as executor:
+            futures = {
+                executor.submit(_run_single, *t): t[0] for t in tasks
+            }
+            for future in as_completed(futures):
+                try:
+                    result = future.result()
                     if result is not None:
-                        db = Database(str(game_dir / "game.db"))
-                        transcript = db.load_transcript(result["game_id"])
-
-                        from realestate_benchmark.environment.state import Message
-                        messages = []
-                        for entry in transcript:
-                            if entry.tool_name == "send_message":
-                                messages.append(Message(
-                                    sender=entry.agent_id,
-                                    content=entry.parameters.get("content", ""),
-                                    turn=entry.turn,
-                                ))
-
-                        advice = llm_judge_unauthorized_advice(
-                            model, transcript, messages, sol_type,
-                        )
-                        result.update(advice)
-                        result["solicitation_type"] = sol_type
-
-                        with open(game_dir / "result.json", "w") as f:
-                            json.dump(result, f, indent=2, default=str)
-
                         all_results.append(result)
-                        elapsed = time.time() - t0
-                        strength = result.get("max_advice_strength", 0)
-                        print(f"strength={strength} ({elapsed:.0f}s)")
-                    else:
-                        print(f"FAILED ({time.time() - t0:.0f}s)")
+                except Exception as e:
+                    print(f"  [{futures[future]}] ERROR: {e}")
+    else:
+        for t in tasks:
+            result = _run_single(*t)
+            if result is not None:
+                all_results.append(result)
 
     return all_results
 
@@ -556,6 +640,8 @@ def run_coercion_experiment(
     max_turns: int = 20,
     output_dir: Path = Path("experiments/harm_results/coercion"),
     use_llm_judge: bool = True,
+    judge_model: ModelInterface | None = None,
+    max_game_workers: int = 1,
 ) -> list[dict[str, Any]]:
     """Run coercive persuasion experiments."""
     if pressure_levels is None:
@@ -569,65 +655,85 @@ def run_coercion_experiment(
         property_types = ["major", "lemon"]
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    all_results: list[dict[str, Any]] = []
 
+    def _run_single(label, prop_idx, vuln_config, vuln_type, mortgage_pct, pressure_name):
+        from realestate_benchmark.environment.state import Message
+
+        print(f"  [{label}] starting...", flush=True)
+        t0 = time.time()
+        game_dir = output_dir / label
+        result = _run_game(
+            model, df, prop_idx,
+            buyer_sophistication="standard",
+            max_turns=max_turns,
+            game_dir=game_dir,
+            use_llm_judge=use_llm_judge,
+            vulnerability_config=vuln_config,
+            mortgage_pct=mortgage_pct,
+            judge_model=judge_model,
+        )
+        if result is not None:
+            db = Database(str(game_dir / "game.db"))
+            transcript = db.load_transcript(result["game_id"])
+            messages = [
+                Message(
+                    sender=entry.agent_id,
+                    content=entry.parameters.get("content", ""),
+                    turn=entry.turn,
+                )
+                for entry in transcript
+                if entry.tool_name == "send_message"
+            ]
+            harm_judge = judge_model or model
+            coercion = llm_judge_coercion(
+                harm_judge, transcript, messages,
+                vuln_type, vuln_config.description,
+            )
+            result.update(coercion)
+            result["seller_pressure"] = pressure_name
+            result["buyer_vulnerability"] = vuln_type
+            with open(game_dir / "result.json", "w") as f:
+                json.dump(result, f, indent=2, default=str)
+            elapsed = time.time() - t0
+            intensity = result.get("coercion_intensity_score", 0.0)
+            targeted = "TARGETED" if result.get("vulnerability_targeted") else ""
+            print(f"  [{label}] intensity={intensity:.2f} {targeted} ({elapsed:.0f}s)")
+        else:
+            print(f"  [{label}] FAILED ({time.time() - t0:.0f}s)")
+        return result
+
+    # Collect all game tasks
+    tasks = []
     for pressure_name, pressure_params in pressure_levels.items():
         for vuln_type in vulnerability_types:
             vuln_config = VULNERABILITY_CONFIGS[vuln_type]
-
             for prop_type in property_types:
                 prop_indices = _select_properties(df, prop_type, num_seeds, base_seed)
-
                 for seed_idx, prop_idx in enumerate(prop_indices):
-                    label = (
-                        f"{pressure_name}_{vuln_type}_{prop_type}_seed{seed_idx}"
-                    )
-                    print(f"  [{label}]", end=" ... ", flush=True)
-                    t0 = time.time()
+                    label = f"{pressure_name}_{vuln_type}_{prop_type}_seed{seed_idx}"
+                    tasks.append((
+                        label, prop_idx, vuln_config, vuln_type,
+                        pressure_params.get("mortgage_pct", 0.85), pressure_name,
+                    ))
 
-                    game_dir = output_dir / label
-                    result = _run_game(
-                        model, df, prop_idx,
-                        buyer_sophistication="standard",
-                        max_turns=max_turns,
-                        game_dir=game_dir,
-                        use_llm_judge=use_llm_judge,
-                        vulnerability_config=vuln_config,
-                        mortgage_pct=pressure_params.get("mortgage_pct", 0.85),
-                    )
-
+    all_results: list[dict[str, Any]] = []
+    if max_game_workers > 1 and len(tasks) > 1:
+        with ThreadPoolExecutor(max_workers=max_game_workers) as executor:
+            futures = {
+                executor.submit(_run_single, *t): t[0] for t in tasks
+            }
+            for future in as_completed(futures):
+                try:
+                    result = future.result()
                     if result is not None:
-                        db = Database(str(game_dir / "game.db"))
-                        transcript = db.load_transcript(result["game_id"])
-
-                        from realestate_benchmark.environment.state import Message
-                        messages = []
-                        for entry in transcript:
-                            if entry.tool_name == "send_message":
-                                messages.append(Message(
-                                    sender=entry.agent_id,
-                                    content=entry.parameters.get("content", ""),
-                                    turn=entry.turn,
-                                ))
-
-                        coercion = llm_judge_coercion(
-                            model, transcript, messages,
-                            vuln_type, vuln_config.description,
-                        )
-                        result.update(coercion)
-                        result["seller_pressure"] = pressure_name
-                        result["buyer_vulnerability"] = vuln_type
-
-                        with open(game_dir / "result.json", "w") as f:
-                            json.dump(result, f, indent=2, default=str)
-
                         all_results.append(result)
-                        elapsed = time.time() - t0
-                        intensity = result.get("coercion_intensity_score", 0.0)
-                        targeted = "TARGETED" if result.get("vulnerability_targeted") else ""
-                        print(f"intensity={intensity:.2f} {targeted} ({elapsed:.0f}s)")
-                    else:
-                        print(f"FAILED ({time.time() - t0:.0f}s)")
+                except Exception as e:
+                    print(f"  [{futures[future]}] ERROR: {e}")
+    else:
+        for t in tasks:
+            result = _run_single(*t)
+            if result is not None:
+                all_results.append(result)
 
     return all_results
 
@@ -649,6 +755,7 @@ def run_tool_use_experiment(
     max_turns: int = 14,
     output_dir: Path = Path("experiments/harm_results/tool_use"),
     use_llm_judge: bool = True,
+    max_game_workers: int = 1,
 ) -> list[dict[str, Any]]:
     """Run tool-use harm experiments.
 
@@ -663,49 +770,66 @@ def run_tool_use_experiment(
         property_types = ["major"]
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    all_results: list[dict[str, Any]] = []
 
+    def _run_single(label, prop_idx, buyer_level, autonomy):
+        print(f"  [{label}] starting...", flush=True)
+        t0 = time.time()
+        game_dir = output_dir / label
+        result = _run_game(
+            model, df, prop_idx,
+            buyer_sophistication=buyer_level,
+            max_turns=max_turns,
+            game_dir=game_dir,
+            use_llm_judge=use_llm_judge,
+            autonomy_level=autonomy,
+        )
+        if result is not None:
+            db = Database(str(game_dir / "game.db"))
+            transcript = db.load_transcript(result["game_id"])
+            tool_metrics = compute_tool_safety_metrics(transcript)
+            result.update(tool_metrics)
+            result["autonomy_level"] = autonomy
+            with open(game_dir / "result.json", "w") as f:
+                json.dump(result, f, indent=2, default=str)
+            elapsed = time.time() - t0
+            n_conseq = result.get("total_consequential_actions", 0)
+            unauth = result.get("unauthorized_action_rate", 0)
+            waive = "WAIVED" if result.get("waive_inspection_used") else ""
+            print(
+                f"  [{label}] conseq={n_conseq} unauth={unauth:.0%} "
+                f"{waive} ({elapsed:.0f}s)"
+            )
+        else:
+            print(f"  [{label}] FAILED ({time.time() - t0:.0f}s)")
+        return result
+
+    # Collect all game tasks
+    tasks = []
     for autonomy in autonomy_levels:
         for buyer_level in buyer_levels:
             for prop_type in property_types:
                 prop_indices = _select_properties(df, prop_type, num_seeds, base_seed)
-
                 for seed_idx, prop_idx in enumerate(prop_indices):
                     label = f"{autonomy}_{buyer_level}_{prop_type}_seed{seed_idx}"
-                    print(f"  [{label}]", end=" ... ", flush=True)
-                    t0 = time.time()
+                    tasks.append((label, prop_idx, buyer_level, autonomy))
 
-                    game_dir = output_dir / label
-                    result = _run_game(
-                        model, df, prop_idx,
-                        buyer_sophistication=buyer_level,
-                        max_turns=max_turns,
-                        game_dir=game_dir,
-                        use_llm_judge=use_llm_judge,
-                        autonomy_level=autonomy,
-                    )
-
+    all_results: list[dict[str, Any]] = []
+    if max_game_workers > 1 and len(tasks) > 1:
+        with ThreadPoolExecutor(max_workers=max_game_workers) as executor:
+            futures = {
+                executor.submit(_run_single, *t): t[0] for t in tasks
+            }
+            for future in as_completed(futures):
+                try:
+                    result = future.result()
                     if result is not None:
-                        db = Database(str(game_dir / "game.db"))
-                        transcript = db.load_transcript(result["game_id"])
-
-                        tool_metrics = compute_tool_safety_metrics(transcript)
-                        result.update(tool_metrics)
-                        result["autonomy_level"] = autonomy
-
-                        with open(game_dir / "result.json", "w") as f:
-                            json.dump(result, f, indent=2, default=str)
-
                         all_results.append(result)
-                        elapsed = time.time() - t0
-                        n_conseq = result.get("total_consequential_actions", 0)
-                        unauth = result.get("unauthorized_action_rate", 0)
-                        waive = "WAIVED" if result.get("waive_inspection_used") else ""
-                        print(
-                            f"conseq={n_conseq} unauth={unauth:.0%} "
-                            f"{waive} ({elapsed:.0f}s)"
-                        )
-                    else:
-                        print(f"FAILED ({time.time() - t0:.0f}s)")
+                except Exception as e:
+                    print(f"  [{futures[future]}] ERROR: {e}")
+    else:
+        for t in tasks:
+            result = _run_single(*t)
+            if result is not None:
+                all_results.append(result)
 
     return all_results
